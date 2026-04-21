@@ -296,7 +296,25 @@ details.stack-section[open] .collapse-arrow{transform:rotate(180deg)}
         <h2 class="page-title">Settings</h2>
       </div>
       <div class="settings-section">
-        <div class="section-title" style="margin-bottom:10px">Export</div>
+        <div class="section-title" style="margin-bottom:10px">Backup &amp; Restore</div>
+        <div class="settings-row" id="backup-json-btn">
+          <div>
+            <div class="settings-row-title">Backup All Data</div>
+            <div class="settings-row-sub">Download a JSON file with all your data</div>
+          </div>
+          <span>↓</span>
+        </div>
+        <label class="settings-row" for="restore-json-input" style="display:flex;cursor:pointer">
+          <div style="flex:1">
+            <div class="settings-row-title">Restore from Backup</div>
+            <div class="settings-row-sub">Import a previously saved JSON backup</div>
+          </div>
+          <span>↑</span>
+        </label>
+        <input type="file" id="restore-json-input" accept=".json,application/json" style="display:none">
+      </div>
+      <div class="settings-section">
+        <div class="section-title" style="margin-bottom:10px">Export (CSV)</div>
         <div class="settings-row" id="export-logs-btn">
           <div>
             <div class="settings-row-title">Export Daily Logs</div>
@@ -859,18 +877,49 @@ const OCR = (() => {
   }
 
   function parseScaleData(text) {
-    const t = text.toLowerCase();
+    const t = text.toLowerCase().replace(/\r/g, '');
     const r = {};
-    const wm = t.match(/(\d+(?:\.\d+)?)\s*(lbs?|kg)(?![^\n]*(?:muscle|lean|fat))/);
-    if (wm) { r.weight=parseFloat(wm[1]); r.weightUnit=wm[2].startsWith('k')?'kg':'lbs'; }
-    const bf = t.match(/(?:body\s*fat|fat\s*%)[^\d]*(\d+(?:\.\d+)?)/);
-    if (bf) r.bodyFat=parseFloat(bf[1]);
-    const lm = t.match(/(?:lean|muscle|skeletal)[^\d]*(\d+(?:\.\d+)?)\s*(lbs?|kg)/);
-    if (lm) r.leanMass=parseFloat(lm[1]);
-    const vf = t.match(/visceral[^\d]*(\d+(?:\.\d+)?)/);
-    if (vf) r.visceralFat=parseFloat(vf[1]);
-    const bm = t.match(/bmi[^\d]*(\d+(?:\.\d+)?)/);
-    if (bm) r.bmi=parseFloat(bm[1]);
+
+    // Find the first number (optionally with a lb/kg unit) within 3 lines after a label pattern.
+    // Using label-anchored matching prevents cross-tile value theft.
+    function after(labelPat, needUnit) {
+      const pat = labelPat
+        + '(?:[^\\n]*\\n){0,3}?[^\\n]*'
+        + '(\\d+(?:\\.\\d+)?)'
+        + (needUnit ? '\\s*(lbs?|kg)' : '');
+      return t.match(new RegExp(pat, 'i'));
+    }
+
+    // Weight: anchor to the "weight" label. Fallback: pick the largest lb/kg value in
+    // the text — body weight is always the single largest mass measurement on these scales.
+    const wLabel = after('\\bweight\\b', true);
+    if (wLabel) {
+      r.weight = parseFloat(wLabel[1]);
+      r.weightUnit = wLabel[2].startsWith('k') ? 'kg' : 'lbs';
+    } else {
+      let max = 0;
+      for (const m of [...t.matchAll(/(\d+(?:\.\d+)?)\s*(lbs?|kg)/g)]) {
+        const v = parseFloat(m[1]);
+        if (v > max) { max = v; r.weight = v; r.weightUnit = m[2].startsWith('k') ? 'kg' : 'lbs'; }
+      }
+    }
+
+    // Body fat %
+    const bfm = after('body\\s*fat|fat\\s*%');
+    if (bfm) r.bodyFat = parseFloat(bfm[1]);
+
+    // Lean/muscle mass: prefer "muscle mass" label, fall back to "fat-free mass" / "lean mass"
+    const lmm = after('muscle\\s*mass', true) || after('fat.free\\s*mass|lean\\s*mass', true);
+    if (lmm) r.leanMass = parseFloat(lmm[1]);
+
+    // Visceral fat
+    const vfm = after('visceral(?:\\s*fat)?');
+    if (vfm) r.visceralFat = parseFloat(vfm[1]);
+
+    // BMI
+    const bmim = after('\\bbmi\\b');
+    if (bmim) r.bmi = parseFloat(bmim[1]);
+
     return r;
   }
 
@@ -1943,6 +1992,45 @@ function downloadCSV(filename, rows) {
   a.download=filename; a.click();
 }
 
+function backupJSON() {
+  const data = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    supplements: Store.getSupps(),
+    peptides: Store.getPeps(),
+    logs: Store.getLogs(),
+    metrics: Store.getMetrics()
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `stack-tracker-backup-${todayStr()}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast('Backup downloaded', 'success');
+}
+
+function restoreJSON(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!data.supplements && !data.peptides) throw new Error('Not a valid backup');
+      if (!confirm('This will overwrite all current data with the backup. Continue?')) return;
+      if (data.supplements) Store.saveSupps(data.supplements);
+      if (data.peptides) Store.savePeps(data.peptides);
+      if (data.logs) localStorage.setItem('st_logs', JSON.stringify(data.logs));
+      if (data.metrics) localStorage.setItem('st_metrics', JSON.stringify(data.metrics));
+      renderToday(); renderStack();
+      toast('Data restored successfully', 'success');
+    } catch {
+      toast('Invalid backup file', 'error');
+    }
+  };
+  reader.readAsText(file);
+}
+
 function exportLogs() {
   const logs=Store.getLogs();
   const supps=Store.getSupps();
@@ -2022,6 +2110,8 @@ document.getElementById('scale-image-input').addEventListener('change',handleSca
 document.getElementById('day-detail-close').addEventListener('click',()=>document.getElementById('overlay-day-detail').classList.remove('active'));
 
 // Settings actions
+document.getElementById('backup-json-btn').addEventListener('click',backupJSON);
+document.getElementById('restore-json-input').addEventListener('change',e=>{ restoreJSON(e.target.files[0]); e.target.value=''; });
 document.getElementById('export-logs-btn').addEventListener('click',exportLogs);
 document.getElementById('export-metrics-btn').addEventListener('click',exportMetrics);
 document.getElementById('export-stack-btn').addEventListener('click',exportStack);
