@@ -750,9 +750,10 @@ const OCR = (() => {
       /^serving$/i, /^value$/i, /^per$/i, /^amount$/i
     ];
     const unitPat = '(mcg|μg|ug|mg|g|IU|international\\s*units?|oz|ml|units?|kcal)';
-    const reInline    = new RegExp(`^(.{2,70}?)\\s+(\\d[\\d,]*(?:\\.\\d+)?)\\s*${unitPat}?\\s*$`, 'i');
-    const reAmountOnly = new RegExp(`^(\\d[\\d,]*(?:\\.\\d+)?)\\s*${unitPat}?\\s*$`, 'i');
-    const endsWithAmt  = new RegExp(`\\d[\\d,]*(?:\\.\\d+)?\\s*${unitPat}\\s*$`, 'i'); // requires a unit to count as "ends with amount"
+    const reInline      = new RegExp(`^(.{2,70}?)\\s+(\\d[\\d,]*(?:\\.\\d+)?)\\s*${unitPat}?\\s*(?:\\([^)]*\\))?\\s*$`, 'i');
+    const reAmountOnly  = new RegExp(`^(\\d[\\d,]*(?:\\.\\d+)?)\\s*${unitPat}?\\s*$`, 'i');
+    const reAmountParen = new RegExp(`^(\\d[\\d,]*(?:\\.\\d+)?)\\s*${unitPat}?\\s*\\([^)]*\\)\\s*$`, 'i');
+    const endsWithAmt   = new RegExp(`\\d[\\d,]*(?:\\.\\d+)?\\s*${unitPat}\\s*$`, 'i'); // requires a unit to count as "ends with amount"
 
     const clean = raw => raw
       .replace(/\s+\d+\s*%[*†]*/g, ' ')   // strip trailing %DV columns
@@ -794,7 +795,20 @@ const OCR = (() => {
         }
       }
 
-      // 3. Standalone amount line — pair with the oldest queued name (FIFO)
+      // 3a. Amount with parenthetical secondary value e.g. "3,000 mg (3 g)"
+      //     These always appear inline with a prominent full-row ingredient → LIFO
+      const mp = line.match(reAmountParen);
+      if (mp) {
+        const amount = parseFloat(mp[1].replace(/,/g, ''));
+        if (!isNaN(amount) && nameQueue.length > 0) {
+          const name = nameQueue.pop(); // LIFO — pairs with last-queued name
+          const unit = mp[2] ? mp[2].trim() : '';
+          nutrients.push({ name, amount, unit, raw: name + ' ' + line });
+        }
+        continue;
+      }
+
+      // 3b. Standalone amount line — pair with the oldest queued name (FIFO)
       //    Handles: names block → values block (e.g. Calories/Total Fat/Protein then 25/2.5g/1g)
       //    AND:     interleaved name → amount pairs (Fish Oil then 2500 mg)
       const ma = line.match(reAmountOnly);
