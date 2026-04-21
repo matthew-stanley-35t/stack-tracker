@@ -221,7 +221,7 @@ canvas#metrics-chart{width:100%;border-radius:12px;display:block}
 .calc-value{font-size:15px;font-weight:700;color:var(--text)}
 .calc-item.highlight .calc-value{color:var(--gold)}
 /* ===== OCR ===== */
-.ocr-section{background:var(--bg3);border:2px dashed var(--border2);border-radius:14px;padding:20px;text-align:center;margin-bottom:16px;cursor:pointer}
+.ocr-section{display:block;background:var(--bg3);border:2px dashed var(--border2);border-radius:14px;padding:20px;text-align:center;margin-bottom:16px;cursor:pointer}
 .ocr-section:active{background:var(--bg4)}
 .ocr-icon{font-size:36px;margin-bottom:8px}
 .ocr-hint{font-size:13px;color:var(--text2)}
@@ -404,8 +404,8 @@ details > summary::-webkit-details-marker{display:none}
           <div class="ocr-icon">📸</div>
           <div class="ocr-hint">Tap to photograph or upload your nutrition label</div>
           <div class="ocr-hint-small">OCR will auto-detect nutrients</div>
-          <input type="file" id="supp-image-input" accept="image/*" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;overflow:hidden">
         </label>
+        <input type="file" id="supp-image-input" accept="image/*" style="display:none">
         <img class="img-preview" id="supp-preview" alt="Label preview">
         <div id="ocr-progress" style="display:none;padding:10px 0">
           <div class="progress-bar-track"><div class="progress-bar-fill" id="ocr-progress-bar"></div></div>
@@ -547,8 +547,8 @@ details > summary::-webkit-details-marker{display:none}
         <div class="ocr-icon">⚖️</div>
         <div class="ocr-hint">Tap to scan smart scale screenshot</div>
         <div class="ocr-hint-small">Auto-detects weight, body fat, lean mass & more</div>
-        <input type="file" id="scale-image-input" accept="image/*" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;overflow:hidden">
       </label>
+      <input type="file" id="scale-image-input" accept="image/*" style="display:none">
       <img class="img-preview" id="metric-preview" alt="Scale preview">
       <div id="metric-ocr-progress" style="display:none;padding:10px 0">
         <div class="progress-bar-track"><div class="progress-bar-fill" id="metric-progress-bar"></div></div>
