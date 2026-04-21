@@ -1,0 +1,1883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Stack Tracker">
+<meta name="theme-color" content="#0A0E1A">
+<title>Stack Tracker</title>
+<style>
+/* ===== VARIABLES ===== */
+:root {
+  --bg: #0A0E1A;
+  --bg2: #0D1629;
+  --bg3: #1A2340;
+  --bg4: #0F1A2E;
+  --blue: #0080C6;
+  --blue-light: #4FC3F7;
+  --gold: #FFB612;
+  --navy: #002244;
+  --text: #FFFFFF;
+  --text2: #8FA8C8;
+  --text3: #5A7A9A;
+  --border: #1E3050;
+  --border2: #253860;
+  --success: #4CAF50;
+  --warning: #FF8F00;
+  --danger: #EF5350;
+  --card-bg: #111928;
+  --nav-h: 64px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+/* ===== RESET ===== */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overscroll-behavior:none}
+body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:15px;line-height:1.5;overflow:hidden}
+input,select,textarea,button{font:inherit;color:inherit;background:none;border:none;outline:none}
+button{cursor:pointer}
+img{max-width:100%;display:block}
+/* ===== LAYOUT ===== */
+#app{display:flex;flex-direction:column;height:100dvh;height:100vh}
+.main-content{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;position:relative}
+.page{display:none;padding:16px 16px calc(16px + var(--safe-bottom));min-height:100%}
+.page.active{display:block}
+/* ===== BOTTOM NAV ===== */
+.bottom-nav{
+  display:flex;background:var(--bg2);border-top:1px solid var(--border);
+  padding-bottom:calc(8px + var(--safe-bottom));padding-top:8px;
+  flex-shrink:0;z-index:100;
+}
+.nav-btn{
+  flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;
+  padding:4px 0;color:var(--text3);font-size:10px;font-weight:500;
+  transition:color .2s;border-radius:8px;
+}
+.nav-btn.active{color:var(--blue)}
+.nav-btn .nav-icon{font-size:22px;line-height:1}
+/* ===== PAGE HEADER ===== */
+.page-header{margin-bottom:20px}
+.page-title{font-size:22px;font-weight:700;letter-spacing:-.3px}
+.page-subtitle{font-size:13px;color:var(--text2);margin-top:2px}
+.header-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:16px}
+/* ===== SECTIONS ===== */
+.section{margin-bottom:24px}
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.section-title{font-size:15px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px}
+/* ===== CARDS ===== */
+.card{background:var(--card-bg);border:1px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:12px}
+.card-header{display:flex;align-items:flex-start;justify-content:space-between;padding:14px 14px 10px}
+.card-body{padding:0 14px 14px}
+.card-name{font-size:16px;font-weight:600}
+.card-sub{font-size:13px;color:var(--text2);margin-top:2px}
+.card-actions{display:flex;gap:4px;flex-shrink:0}
+.card-notes{font-size:13px;color:var(--text2);margin-top:8px;font-style:italic}
+/* ===== BUTTONS ===== */
+.btn-primary{background:var(--blue);color:#fff;padding:10px 18px;border-radius:10px;font-size:14px;font-weight:600;transition:opacity .2s}
+.btn-primary:active{opacity:.8}
+.btn-secondary{background:var(--bg3);color:var(--text);padding:10px 18px;border-radius:10px;font-size:14px;font-weight:600;border:1px solid var(--border2)}
+.btn-secondary:active{opacity:.7}
+.btn-gold{background:var(--gold);color:#000;padding:10px 18px;border-radius:10px;font-size:14px;font-weight:700}
+.btn-danger{background:var(--danger);color:#fff;padding:10px 18px;border-radius:10px;font-size:14px;font-weight:600}
+.btn-icon{width:36px;height:36px;display:flex;align-items:center;justify-content:center;border-radius:8px;font-size:16px;background:var(--bg3);color:var(--text2);transition:background .15s}
+.btn-icon:active{background:var(--border2)}
+.btn-link{background:none;color:var(--blue);font-size:13px;padding:0}
+.btn-full{width:100%;text-align:center}
+/* ===== FORMS ===== */
+.form-group{margin-bottom:16px}
+.form-label{display:block;font-size:13px;font-weight:600;color:var(--text2);margin-bottom:6px;text-transform:uppercase;letter-spacing:.4px}
+.input{width:100%;background:var(--bg4);border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:15px;color:var(--text);transition:border-color .2s}
+.input:focus{border-color:var(--blue)}
+.input::placeholder{color:var(--text3)}
+.select{width:100%;background:var(--bg4);border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:15px;color:var(--text);-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238FA8C8' fill='none' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center}
+.select option{background:var(--bg2)}
+.input-row{display:flex;gap:10px}
+.input-row .form-group{flex:1}
+/* ===== OVERLAYS ===== */
+.overlay{position:fixed;inset:0;background:var(--bg);z-index:200;display:flex;flex-direction:column;transform:translateY(100%);transition:transform .3s ease;overflow:hidden}
+.overlay.active{transform:translateY(0)}
+.overlay-header{display:flex;align-items:center;justify-content:space-between;padding:16px 16px 0;padding-top:calc(16px + env(safe-area-inset-top,0px));border-bottom:1px solid var(--border);flex-shrink:0;background:var(--bg)}
+.overlay-title{font-size:18px;font-weight:700}
+.overlay-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:20px 16px;padding-bottom:calc(20px + var(--safe-bottom))}
+.overlay-footer{padding:16px;padding-bottom:calc(16px + var(--safe-bottom));border-top:1px solid var(--border);display:flex;gap:10px;flex-shrink:0;background:var(--bg2)}
+/* ===== MODALS ===== */
+.modal-backdrop{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:300;align-items:flex-end;justify-content:center}
+.modal-backdrop.active,
+.modal-backdrop[style*="flex"]{display:flex}
+.modal{background:var(--bg2);border-radius:20px 20px 0 0;padding:24px 20px;padding-bottom:calc(24px + var(--safe-bottom));width:100%;border:1px solid var(--border)}
+.modal-title{font-size:18px;font-weight:700;margin-bottom:16px}
+.modal-actions{display:flex;gap:10px;margin-top:20px}
+/* ===== CHECK-IN ===== */
+.checkin-list{display:flex;flex-direction:column;gap:2px}
+.checkin-row{display:flex;align-items:center;justify-content:space-between;padding:13px 14px;background:var(--card-bg);border:1px solid var(--border);border-radius:12px;transition:background .2s}
+.checkin-row.taken{background:#0A2010;border-color:#1A4020}
+.checkin-label{display:flex;align-items:center;gap:12px;flex:1;cursor:pointer}
+.checkin-label input[type=checkbox]{display:none}
+.checkmark{width:24px;height:24px;border-radius:6px;border:2px solid var(--border2);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s}
+.checkin-label input:checked ~ .checkmark{background:var(--success);border-color:var(--success)}
+.checkin-label input:checked ~ .checkmark::after{content:'✓';color:#fff;font-size:13px;font-weight:700}
+.checkin-info{display:flex;flex-direction:column;gap:1px}
+.checkin-name{font-size:15px;font-weight:500}
+.checkin-sub{font-size:12px;color:var(--text2)}
+.pep-dot{display:inline-block;width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-right:4px;vertical-align:middle}
+.pep-dot.large{width:14px;height:14px}
+.btn-extra{font-size:12px;color:var(--text2);background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:5px 10px;flex-shrink:0}
+.count-badge{font-size:13px;font-weight:600;color:var(--gold);background:rgba(255,182,18,.12);padding:3px 10px;border-radius:20px}
+.all-done-badge{background:linear-gradient(135deg,#0A2A10,#0F3A18);border:1px solid #2A6A30;color:#4CAF50;border-radius:10px;padding:10px 14px;font-size:13px;font-weight:600;text-align:center;margin-top:10px}
+/* ===== DATE NAV ===== */
+.date-nav{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px}
+.date-nav .btn-icon{width:40px;height:40px;font-size:24px;color:var(--blue);background:transparent}
+/* ===== NUTRIENT TOTALS ===== */
+.nutrient-totals{background:var(--card-bg);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+.nutrient-total-row{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border)}
+.nutrient-total-row:last-child{border-bottom:none}
+.nutrient-total-row.calorie-row{background:rgba(255,182,18,.07);border-bottom-color:rgba(255,182,18,.2)}
+.nutrient-total-name{font-size:14px;color:var(--text2)}
+.nutrient-total-val{font-size:14px;font-weight:600;color:var(--text)}
+.calorie-row .nutrient-total-name{color:var(--gold);font-weight:600}
+.calorie-row .nutrient-total-val{color:var(--gold);font-size:16px}
+/* ===== NUTRIENT ROWS (add form) ===== */
+.nutrient-row{display:grid;grid-template-columns:1fr 80px 70px 36px;gap:6px;margin-bottom:8px;align-items:center}
+.nutrient-row .input{padding:8px 10px;font-size:13px}
+.remove-nutrient{background:none;color:var(--danger);font-size:16px;width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center}
+/* ===== PEPTIDE CARD ===== */
+.card-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px}
+.stat{background:var(--bg4);border-radius:8px;padding:8px 10px}
+.stat-label{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:2px}
+.stat-value{font-size:14px;font-weight:600}
+.stat-warning .stat-value{color:var(--warning)}
+.dose-progress{height:4px;background:var(--bg3);border-radius:2px;margin-top:10px;overflow:hidden}
+.dose-progress-bar{height:100%;background:linear-gradient(90deg,var(--blue),var(--gold));border-radius:2px;transition:width .5s}
+.badge-ended{font-size:11px;background:var(--bg3);color:var(--text3);border-radius:6px;padding:2px 8px;margin-left:6px;font-weight:500}
+.ended{opacity:.6}
+/* ===== SUPPLEMENT CARD ===== */
+.day-pills{display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap}
+.day-pill{font-size:11px;font-weight:600;padding:3px 7px;border-radius:6px;background:var(--bg3);color:var(--text3)}
+.day-pill.active{background:rgba(0,128,198,.2);color:var(--blue)}
+.supp-nutrients{display:flex;flex-wrap:wrap;gap:6px}
+.nutrient-chip{font-size:11px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:3px 8px;color:var(--text2)}
+/* ===== CALENDAR ===== */
+.cal-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px}
+.view-toggle{display:flex;background:var(--bg3);border-radius:8px;padding:2px;gap:2px}
+.view-btn{padding:6px 14px;border-radius:6px;font-size:13px;font-weight:600;color:var(--text2);transition:all .2s}
+.view-btn.active{background:var(--blue);color:#fff}
+.filter-select{flex:1;max-width:180px;padding:7px 12px;font-size:13px;background:var(--bg4);border:1px solid var(--border);border-radius:8px;color:var(--text)}
+.cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding:0 4px}
+.cal-period-label{font-size:16px;font-weight:700}
+.cal-grid.month-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.cal-header-cell{text-align:center;font-size:11px;font-weight:600;color:var(--text3);padding:4px 0 8px;text-transform:uppercase}
+.cal-cell{background:var(--card-bg);border:1px solid var(--border);border-radius:8px;padding:6px 4px;min-height:56px;cursor:pointer;transition:background .15s}
+.cal-cell:active{background:var(--bg3)}
+.cal-cell.empty{background:transparent;border-color:transparent;cursor:default}
+.cal-cell.today{border-color:var(--blue)}
+.cal-day-num{font-size:13px;font-weight:600;display:block;margin-bottom:3px;text-align:center}
+.cal-cell.today .cal-day-num{color:var(--blue)}
+.cal-dots{display:flex;flex-wrap:wrap;gap:2px;justify-content:center}
+.cal-dot{display:inline-block;width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.cal-dot.pending{opacity:.4}
+.cal-dot.taken{opacity:1}
+/* Week view */
+.cal-grid.week-grid{display:flex;flex-direction:column;gap:6px}
+.week-cell{min-height:auto;padding:10px 12px;border-radius:10px}
+.week-cell-header{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.week-day-name{font-size:12px;font-weight:600;color:var(--text2);width:28px}
+.week-day-num{font-size:15px;font-weight:700}
+.week-cell.today .week-day-num{color:var(--blue)}
+.week-peptides{display:flex;flex-direction:column;gap:4px}
+.week-pep-row{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text2)}
+.week-pep-row.taken{color:var(--success)}
+.week-pep-name{font-size:13px}
+/* Day detail */
+.day-detail-list{display:flex;flex-direction:column;gap:12px}
+.day-detail-row{display:flex;align-items:center;justify-content:space-between;background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:14px}
+.day-detail-info{display:flex;align-items:center;gap:12px}
+.day-detail-name{font-size:15px;font-weight:600}
+.day-detail-sub{font-size:12px;color:var(--text2);margin-top:2px}
+.taken-toggle{font-size:13px;font-weight:600;padding:7px 14px;border-radius:8px;border:1px solid var(--border2);color:var(--text2);background:var(--bg3);cursor:pointer;white-space:nowrap}
+.taken-toggle.taken{background:rgba(76,175,80,.15);border-color:#2A5A2A;color:var(--success)}
+/* ===== METRICS ===== */
+.metrics-list{display:flex;flex-direction:column;gap:8px}
+.metric-row{background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:13px 14px;display:flex;align-items:center;gap:10px}
+.metric-date{font-size:13px;font-weight:600;color:var(--text2);min-width:80px}
+.metric-values{display:flex;flex-wrap:wrap;gap:4px;flex:1}
+.metric-chip{font-size:12px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;padding:2px 8px;color:var(--text)}
+.metric-actions{display:flex;gap:4px}
+.chart-tabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.chart-tab{font-size:12px;font-weight:600;padding:6px 12px;border-radius:8px;background:var(--bg3);color:var(--text2);border:1px solid var(--border)}
+.chart-tab.active{background:rgba(0,128,198,.2);border-color:var(--blue);color:var(--blue)}
+canvas#metrics-chart{width:100%;border-radius:12px;display:block}
+/* ===== SETTINGS PAGE ===== */
+.settings-section{margin-bottom:24px}
+.settings-row{display:flex;align-items:center;justify-content:space-between;padding:14px;background:var(--card-bg);border:1px solid var(--border);border-radius:12px;margin-bottom:8px;cursor:pointer}
+.settings-row:active{background:var(--bg3)}
+.settings-row-title{font-size:15px;font-weight:500}
+.settings-row-sub{font-size:12px;color:var(--text2);margin-top:2px}
+/* ===== CALC RESULT ===== */
+.calc-result-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;background:rgba(0,128,198,.05);border:1px solid rgba(0,128,198,.2);border-radius:12px;padding:14px}
+.calc-item{display:flex;flex-direction:column;gap:2px}
+.calc-item.highlight{background:rgba(255,182,18,.1);border-radius:8px;padding:6px;border:1px solid rgba(255,182,18,.2)}
+.calc-label{font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.4px}
+.calc-value{font-size:15px;font-weight:700;color:var(--text)}
+.calc-item.highlight .calc-value{color:var(--gold)}
+/* ===== OCR ===== */
+.ocr-section{background:var(--bg3);border:2px dashed var(--border2);border-radius:14px;padding:20px;text-align:center;margin-bottom:16px;cursor:pointer}
+.ocr-section:active{background:var(--bg4)}
+.ocr-icon{font-size:36px;margin-bottom:8px}
+.ocr-hint{font-size:13px;color:var(--text2)}
+.ocr-hint-small{font-size:11px;color:var(--text3);margin-top:4px}
+#ocr-progress,#metric-ocr-progress{background:var(--bg4);border-radius:10px;overflow:hidden;margin-top:10px}
+.progress-bar-track{height:6px;background:var(--bg3);border-radius:3px;overflow:hidden}
+.progress-bar-fill{height:100%;background:linear-gradient(90deg,var(--blue),var(--blue-light));border-radius:3px;width:0%;transition:width .3s}
+.ocr-status{font-size:12px;color:var(--text2);margin-top:6px;text-align:center}
+.img-preview{width:100%;max-height:200px;object-fit:contain;border-radius:10px;margin-top:10px;display:none}
+/* ===== DAYS GRID ===== */
+.days-grid{display:flex;gap:6px;flex-wrap:wrap}
+.day-check-label{cursor:pointer}
+.day-check-label input{display:none}
+.day-chip{display:inline-block;width:38px;height:38px;line-height:38px;text-align:center;border-radius:50%;background:var(--bg3);border:2px solid var(--border);font-size:12px;font-weight:700;color:var(--text2);transition:all .2s}
+.day-check-label input:checked ~ .day-chip{background:var(--blue);border-color:var(--blue);color:#fff}
+/* ===== COLOR PICKER ===== */
+.color-swatches{display:flex;flex-wrap:wrap;gap:8px}
+.color-swatch{width:32px;height:32px;border-radius:50%;cursor:pointer;border:3px solid transparent;transition:border-color .15s}
+.color-swatch.selected{border-color:#fff}
+/* ===== MISC ===== */
+.muted{color:var(--text2)}
+.small{font-size:13px}
+.empty-state{text-align:center;padding:40px 20px;color:var(--text2)}
+.empty-icon{font-size:48px;margin-bottom:12px}
+.empty-hint{text-align:center;color:var(--text3);font-size:13px;padding:20px 0}
+.stack-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.pep-card-title{display:flex;align-items:center;gap:8px;flex:1;min-width:0}
+.pep-card-title .card-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ended-section{margin-top:12px}
+.ended-section summary{font-size:13px;color:var(--text3);cursor:pointer;padding:4px 0;list-style:none}
+details > summary::-webkit-details-marker{display:none}
+.freq-section{margin-top:10px}
+.section-divider{height:1px;background:var(--border);margin:20px 0}
+.toast{position:fixed;bottom:calc(var(--nav-h) + 12px + var(--safe-bottom));left:50%;transform:translateX(-50%);background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:10px 20px;border-radius:10px;font-size:14px;font-weight:500;z-index:1000;opacity:0;transition:opacity .3s;pointer-events:none;max-width:90%;text-align:center}
+.toast.show{opacity:1}
+.toast.success{border-color:var(--success);color:var(--success)}
+.toast.error{border-color:var(--danger);color:var(--danger)}
+.toast.warning{border-color:var(--warning);color:var(--warning)}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ===== MAIN CONTENT ===== -->
+  <div class="main-content">
+
+    <!-- TODAY PAGE -->
+    <div id="page-today" class="page active"></div>
+
+    <!-- STACK PAGE -->
+    <div id="page-stack" class="page"></div>
+
+    <!-- CALENDAR PAGE -->
+    <div id="page-calendar" class="page"></div>
+
+    <!-- METRICS PAGE -->
+    <div id="page-metrics" class="page"></div>
+
+    <!-- SETTINGS PAGE -->
+    <div id="page-settings" class="page">
+      <div class="page-header">
+        <h2 class="page-title">Settings</h2>
+      </div>
+      <div class="settings-section">
+        <div class="section-title" style="margin-bottom:10px">Export</div>
+        <div class="settings-row" id="export-logs-btn">
+          <div>
+            <div class="settings-row-title">Export Daily Logs</div>
+            <div class="settings-row-sub">Download supplement & peptide log as CSV</div>
+          </div>
+          <span>↓</span>
+        </div>
+        <div class="settings-row" id="export-metrics-btn">
+          <div>
+            <div class="settings-row-title">Export Body Metrics</div>
+            <div class="settings-row-sub">Download measurements as CSV</div>
+          </div>
+          <span>↓</span>
+        </div>
+        <div class="settings-row" id="export-stack-btn">
+          <div>
+            <div class="settings-row-title">Export Full Stack</div>
+            <div class="settings-row-sub">Download all supplements & peptides as CSV</div>
+          </div>
+          <span>↓</span>
+        </div>
+      </div>
+      <div class="settings-section">
+        <div class="section-title" style="margin-bottom:10px">Data</div>
+        <div class="settings-row" id="clear-data-btn" style="border-color:rgba(239,83,80,.3)">
+          <div>
+            <div class="settings-row-title" style="color:var(--danger)">Clear All Data</div>
+            <div class="settings-row-sub">Delete everything — cannot be undone</div>
+          </div>
+          <span style="color:var(--danger)">⚠</span>
+        </div>
+      </div>
+      <div class="settings-section">
+        <p class="muted small" style="text-align:center;line-height:1.7">
+          Stack Tracker v1.0<br>
+          Data stored locally on this device<br>
+          LA Chargers ⚡
+        </p>
+      </div>
+    </div>
+
+  </div><!-- /main-content -->
+
+  <!-- ===== BOTTOM NAV ===== -->
+  <nav class="bottom-nav">
+    <button class="nav-btn active" data-page="today">
+      <span class="nav-icon">✓</span>
+      Today
+    </button>
+    <button class="nav-btn" data-page="stack">
+      <span class="nav-icon">⚡</span>
+      Stack
+    </button>
+    <button class="nav-btn" data-page="calendar">
+      <span class="nav-icon">📅</span>
+      Calendar
+    </button>
+    <button class="nav-btn" data-page="metrics">
+      <span class="nav-icon">📊</span>
+      Metrics
+    </button>
+    <button class="nav-btn" data-page="settings">
+      <span class="nav-icon">⚙️</span>
+      Settings
+    </button>
+  </nav>
+
+</div><!-- /app -->
+
+<!-- ===== OVERLAY: ADD SUPPLEMENT ===== -->
+<div class="overlay" id="overlay-supplement">
+  <div class="overlay-header">
+    <button class="btn-link" id="supp-cancel-btn">Cancel</button>
+    <span class="overlay-title" id="supp-overlay-title">Add Supplement</span>
+    <button class="btn-link" style="color:var(--gold)" id="supp-save-btn">Save</button>
+  </div>
+  <div class="overlay-body">
+    <form id="supp-form" onsubmit="return false">
+      <div class="form-group">
+        <label class="form-label">Supplement Name *</label>
+        <input class="input" id="supp-name" type="text" placeholder="e.g. Vitamin D3" autocomplete="off">
+      </div>
+      <div class="input-row">
+        <div class="form-group">
+          <label class="form-label">Brand</label>
+          <input class="input" id="supp-brand" type="text" placeholder="Optional" autocomplete="off">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Servings/day</label>
+          <input class="input" id="supp-servings" type="number" value="1" min="1">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Days Taken</label>
+        <div class="days-grid">
+          <label class="day-check-label"><input type="checkbox" class="day-cb" value="0" checked><span class="day-chip">Su</span></label>
+          <label class="day-check-label"><input type="checkbox" class="day-cb" value="1" checked><span class="day-chip">Mo</span></label>
+          <label class="day-check-label"><input type="checkbox" class="day-cb" value="2" checked><span class="day-chip">Tu</span></label>
+          <label class="day-check-label"><input type="checkbox" class="day-cb" value="3" checked><span class="day-chip">We</span></label>
+          <label class="day-check-label"><input type="checkbox" class="day-cb" value="4" checked><span class="day-chip">Th</span></label>
+          <label class="day-check-label"><input type="checkbox" class="day-cb" value="5" checked><span class="day-chip">Fr</span></label>
+          <label class="day-check-label"><input type="checkbox" class="day-cb" value="6" checked><span class="day-chip">Sa</span></label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Notes</label>
+        <input class="input" id="supp-notes" type="text" placeholder="Optional notes">
+      </div>
+
+      <!-- OCR Section -->
+      <div id="ocr-section">
+        <div class="section-divider"></div>
+        <div class="form-label" style="margin-bottom:10px">Scan Nutrition Label (Optional)</div>
+        <label class="ocr-section" for="supp-image-input">
+          <div class="ocr-icon">📸</div>
+          <div class="ocr-hint">Tap to photograph or upload your nutrition label</div>
+          <div class="ocr-hint-small">OCR will auto-detect nutrients</div>
+          <input type="file" id="supp-image-input" accept="image/*" capture="environment" style="display:none">
+        </label>
+        <img class="img-preview" id="supp-preview" alt="Label preview">
+        <div id="ocr-progress" style="display:none;padding:10px 0">
+          <div class="progress-bar-track"><div class="progress-bar-fill" id="ocr-progress-bar"></div></div>
+          <div class="ocr-status" id="ocr-status">Scanning...</div>
+        </div>
+        <details id="ocr-debug" style="display:none;margin-top:10px">
+          <summary style="font-size:12px;color:var(--text3);cursor:pointer">Show raw OCR text (for debugging)</summary>
+          <pre id="ocr-raw-text" style="font-size:10px;color:var(--text2);background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:10px;margin-top:8px;white-space:pre-wrap;word-break:break-word;max-height:200px;overflow-y:auto"></pre>
+        </details>
+      </div>
+
+      <!-- Nutrients Section -->
+      <div id="nutrients-section" style="display:none">
+        <div class="section-divider"></div>
+        <div class="section-header" style="margin-bottom:10px">
+          <span class="form-label" style="margin-bottom:0">Nutrients</span>
+          <button type="button" class="btn-link" id="add-nutrient-btn">+ Add Row</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 80px 70px 36px;gap:6px;margin-bottom:6px">
+          <span class="small muted">Name</span><span class="small muted">Amount</span><span class="small muted">Unit</span><span></span>
+        </div>
+        <div id="nutrient-list"></div>
+      </div>
+      <div style="margin-top:16px">
+        <button type="button" class="btn-secondary btn-full" id="show-nutrients-btn">+ Add Nutrients Manually</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ===== OVERLAY: ADD PEPTIDE ===== -->
+<div class="overlay" id="overlay-peptide">
+  <div class="overlay-header">
+    <button class="btn-link" id="pep-cancel-btn">Cancel</button>
+    <span class="overlay-title" id="pep-overlay-title">Add Peptide</span>
+    <button class="btn-link" style="color:var(--gold)" id="pep-save-btn">Save</button>
+  </div>
+  <div class="overlay-body">
+    <form id="pep-form" onsubmit="return false">
+      <div class="form-group">
+        <label class="form-label">Peptide Name *</label>
+        <input class="input" id="pep-name" type="text" placeholder="e.g. BPC-157" autocomplete="off">
+      </div>
+
+      <div class="section-divider"></div>
+      <div class="form-label" style="margin-bottom:12px">Dose Calculator</div>
+
+      <div class="input-row">
+        <div class="form-group">
+          <label class="form-label">Powder (mg)</label>
+          <input class="input" id="pep-mg" type="number" step="any" min="0" placeholder="e.g. 5">
+        </div>
+        <div class="form-group">
+          <label class="form-label">BAC Water (mL)</label>
+          <input class="input" id="pep-bac" type="number" step="any" min="0" placeholder="e.g. 2">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Desired Dose per Injection (mcg)</label>
+        <input class="input" id="pep-dose" type="number" step="any" min="0" placeholder="e.g. 250">
+      </div>
+      <div id="pep-result" style="display:none;margin-bottom:16px"></div>
+
+      <div class="section-divider"></div>
+      <div class="form-label" style="margin-bottom:12px">Frequency</div>
+
+      <div class="form-group">
+        <label class="form-label">Schedule Type</label>
+        <select class="select" id="pep-frequency-type">
+          <option value="daily">Daily</option>
+          <option value="weekly">Specific Days of Week</option>
+          <option value="cadence">Cadence (e.g. 5 on / 2 off)</option>
+        </select>
+      </div>
+
+      <div id="freq-weekly-inputs" class="freq-section" style="display:none">
+        <label class="form-label">Injection Days</label>
+        <div class="days-grid">
+          <label class="day-check-label"><input type="checkbox" class="pep-day-cb" value="0"><span class="day-chip">Su</span></label>
+          <label class="day-check-label"><input type="checkbox" class="pep-day-cb" value="1"><span class="day-chip">Mo</span></label>
+          <label class="day-check-label"><input type="checkbox" class="pep-day-cb" value="2"><span class="day-chip">Tu</span></label>
+          <label class="day-check-label"><input type="checkbox" class="pep-day-cb" value="3"><span class="day-chip">We</span></label>
+          <label class="day-check-label"><input type="checkbox" class="pep-day-cb" value="4"><span class="day-chip">Th</span></label>
+          <label class="day-check-label"><input type="checkbox" class="pep-day-cb" value="5"><span class="day-chip">Fr</span></label>
+          <label class="day-check-label"><input type="checkbox" class="pep-day-cb" value="6"><span class="day-chip">Sa</span></label>
+        </div>
+      </div>
+
+      <div id="freq-cadence-inputs" class="freq-section" style="display:none">
+        <div class="input-row">
+          <div class="form-group">
+            <label class="form-label">Days On</label>
+            <input class="input" id="pep-cadence-on" type="number" value="5" min="1">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Days Off</label>
+            <input class="input" id="pep-cadence-off" type="number" value="2" min="0">
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-top:10px">
+        <label class="form-label">Cycle Start Date</label>
+        <input class="input" id="pep-cycle-start" type="date">
+      </div>
+
+      <div class="section-divider"></div>
+      <div class="form-label" style="margin-bottom:12px">Appearance</div>
+
+      <div class="form-group">
+        <label class="form-label">Dot Color</label>
+        <div class="color-swatches" id="color-swatches"></div>
+        <input type="hidden" id="pep-color">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Notes</label>
+        <input class="input" id="pep-notes" type="text" placeholder="Optional notes">
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ===== OVERLAY: ADD METRIC ===== -->
+<div class="overlay" id="overlay-metric">
+  <div class="overlay-header">
+    <button class="btn-link" id="metric-cancel-btn">Cancel</button>
+    <span class="overlay-title">Add Measurement</span>
+    <button class="btn-link save-btn" style="color:var(--gold)" id="metric-save-btn">Save</button>
+  </div>
+  <div class="overlay-body">
+    <form id="metric-form" onsubmit="return false">
+      <div class="form-group">
+        <label class="form-label">Date</label>
+        <input class="input" id="metric-date" type="date">
+      </div>
+
+      <label class="ocr-section" for="scale-image-input" style="margin-bottom:16px">
+        <div class="ocr-icon">⚖️</div>
+        <div class="ocr-hint">Tap to scan smart scale screenshot</div>
+        <div class="ocr-hint-small">Auto-detects weight, body fat, lean mass & more</div>
+        <input type="file" id="scale-image-input" accept="image/*" capture="environment" style="display:none">
+      </label>
+      <img class="img-preview" id="metric-preview" alt="Scale preview">
+      <div id="metric-ocr-progress" style="display:none;padding:10px 0">
+        <div class="progress-bar-track"><div class="progress-bar-fill" id="metric-progress-bar"></div></div>
+        <div class="ocr-status" id="metric-ocr-progress-status">Scanning...</div>
+      </div>
+      <div id="metric-ocr-status" class="ocr-status" style="display:none;margin-bottom:12px"></div>
+
+      <div class="input-row">
+        <div class="form-group" style="flex:2">
+          <label class="form-label">Weight</label>
+          <input class="input" id="metric-weight" type="number" step="0.1" placeholder="e.g. 185.5">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Unit</label>
+          <select class="select" id="metric-unit" style="padding:12px 8px">
+            <option value="lbs">lbs</option>
+            <option value="kg">kg</option>
+          </select>
+        </div>
+      </div>
+      <div class="input-row">
+        <div class="form-group">
+          <label class="form-label">Body Fat %</label>
+          <input class="input" id="metric-bodyfat" type="number" step="0.1" placeholder="e.g. 18.2">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Lean Mass</label>
+          <input class="input" id="metric-lean" type="number" step="0.1" placeholder="lbs/kg">
+        </div>
+      </div>
+      <div class="input-row">
+        <div class="form-group">
+          <label class="form-label">Visceral Fat</label>
+          <input class="input" id="metric-visceral" type="number" step="0.1" placeholder="score">
+        </div>
+        <div class="form-group">
+          <label class="form-label">BMI</label>
+          <input class="input" id="metric-bmi" type="number" step="0.1" placeholder="e.g. 24.5">
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ===== OVERLAY: DAY DETAIL ===== -->
+<div class="overlay" id="overlay-day-detail">
+  <div class="overlay-header">
+    <button class="btn-link" id="day-detail-close">← Back</button>
+    <span class="overlay-title" id="day-detail-title">Day Detail</span>
+    <span></span>
+  </div>
+  <div class="overlay-body" id="day-detail-body"></div>
+</div>
+
+<!-- ===== MODAL: EXTRA DOSES ===== -->
+<div class="modal-backdrop" id="modal-extra-doses">
+  <div class="modal">
+    <div class="modal-title" id="extra-doses-title">Extra Doses</div>
+    <div class="form-group">
+      <label class="form-label">Extra doses taken today</label>
+      <input class="input" id="extra-doses-input" type="number" min="0" value="0">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary btn-full" id="extra-doses-cancel">Cancel</button>
+      <button class="btn-primary btn-full" id="extra-doses-save">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== MODAL: EDIT CYCLE ===== -->
+<div class="modal-backdrop" id="modal-edit-cycle">
+  <div class="modal">
+    <div class="modal-title">Edit Cycle — <span id="edit-cycle-name"></span></div>
+    <div class="form-group">
+      <label class="form-label">Cycle Start Date</label>
+      <input class="input" id="edit-cycle-start" type="date">
+    </div>
+    <div class="input-row">
+      <div class="form-group">
+        <label class="form-label">Week # Override</label>
+        <input class="input" id="edit-cycle-weeks" type="number" min="0" placeholder="Auto">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Remaining Doses Override</label>
+        <input class="input" id="edit-cycle-remaining" type="number" min="0" placeholder="Auto">
+      </div>
+    </div>
+    <p class="muted small" style="margin-bottom:4px">Use overrides to set current values mid-cycle. Leave blank to auto-calculate.</p>
+    <div class="modal-actions">
+      <button class="btn-secondary btn-full" id="edit-cycle-cancel">Cancel</button>
+      <button class="btn-primary btn-full" id="edit-cycle-save">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== TOAST ===== -->
+<div class="toast" id="toast"></div>
+
+<!-- No external OCR library needed — uses OCR.space API via fetch -->
+
+<script>
+// ============================================================
+// STORAGE
+// ============================================================
+const Store = (() => {
+  const K = { SUPPS:'st_supps', PEPS:'st_peps', LOGS:'st_logs', METRICS:'st_metrics' };
+  const get = k => { try { return JSON.parse(localStorage.getItem(k)) || []; } catch { return []; }};
+  const getObj = k => { try { return JSON.parse(localStorage.getItem(k)) || {}; } catch { return {}; }};
+  const set = (k,v) => localStorage.setItem(k, JSON.stringify(v));
+  const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+
+  // Supplements
+  const getSupps = () => get(K.SUPPS);
+  const saveSupps = a => set(K.SUPPS, a);
+  const addSupp = s => { const a = getSupps(); s.id = uid(); s.createdAt = new Date().toISOString(); a.push(s); saveSupps(a); return s; };
+  const updateSupp = (id, u) => saveSupps(getSupps().map(s => s.id===id ? {...s,...u} : s));
+  const deleteSupp = id => saveSupps(getSupps().filter(s => s.id !== id));
+
+  // Peptides
+  const getPeps = () => get(K.PEPS);
+  const savePeps = a => set(K.PEPS, a);
+  const addPep = p => { const a = getPeps(); p.id = uid(); p.createdAt = new Date().toISOString(); a.push(p); savePeps(a); return p; };
+  const updatePep = (id, u) => savePeps(getPeps().map(p => p.id===id ? {...p,...u} : p));
+  const deletePep = id => savePeps(getPeps().filter(p => p.id !== id));
+
+  // Logs
+  const getLogs = () => getObj(K.LOGS);
+  const getLog = date => { const L = getLogs(); if(!L[date]) L[date]={supplements:{},peptides:{}}; return L[date]; };
+  const saveLog = (date, log) => { const L = getLogs(); L[date] = log; set(K.LOGS, L); };
+  const toggleSupp = (date, id, val) => { const l = getLog(date); if(!l.supplements[id]) l.supplements[id]={taken:false,extraDoses:0}; l.supplements[id].taken=val; saveLog(date,l); };
+  const setExtra = (date, id, n) => { const l = getLog(date); if(!l.supplements[id]) l.supplements[id]={taken:false,extraDoses:0}; l.supplements[id].extraDoses=parseInt(n)||0; saveLog(date,l); };
+  const togglePep = (date, id, val) => { const l = getLog(date); if(!l.peptides[id]) l.peptides[id]={taken:false}; l.peptides[id].taken=val; saveLog(date,l); };
+
+  // Metrics
+  const getMetrics = () => get(K.METRICS);
+  const addMetric = m => { const a = getMetrics(); m.id=uid(); m.createdAt=new Date().toISOString(); a.push(m); a.sort((x,y)=>x.date.localeCompare(y.date)); set(K.METRICS,a); return m; };
+  const deleteMetric = id => set(K.METRICS, getMetrics().filter(m => m.id!==id));
+  const updateMetric = (id,u) => set(K.METRICS, getMetrics().map(m => m.id===id ? {...m,...u} : m));
+
+  return { uid, getSupps, saveSupps, addSupp, updateSupp, deleteSupp, getPeps, savePeps, addPep, updatePep, deletePep, getLogs, getLog, saveLog, toggleSupp, setExtra, togglePep, getMetrics, addMetric, deleteMetric, updateMetric };
+})();
+
+// ============================================================
+// OCR  (uses ocr.space free API — works from file:// with no WASM/workers)
+// ============================================================
+const OCR = (() => {
+  // Free demo key — good for ~500 requests/day.
+  // Get your own free key at https://ocr.space/ocrapi (no CC required).
+  const API_KEY = 'helloworld';
+
+  async function recognize(imageFile, progressBarId='ocr-progress-bar', statusId='ocr-status') {
+    const bar = document.getElementById(progressBarId);
+    const st  = document.getElementById(statusId);
+    const tick = (pct, msg) => { if (bar) bar.style.width = pct+'%'; if (st) st.textContent = msg; };
+
+    tick(20, 'Uploading image…');
+
+    // Convert file to base64 so fetch works from file:// (avoids FormData CORS issues on some browsers)
+    const b64 = await new Promise((res, rej) => {
+      const reader = new FileReader();
+      reader.onload = e => res(e.target.result.split(',')[1]);
+      reader.onerror = rej;
+      reader.readAsDataURL(imageFile);
+    });
+
+    tick(50, 'Scanning…');
+
+    const body = new URLSearchParams({
+      base64Image: 'data:image/jpeg;base64,' + b64,
+      language: 'eng',
+      isOverlayRequired: 'false',
+      detectOrientation: 'true',
+      scale: 'true',
+      OCREngine: '2',
+    });
+
+    const resp = await fetch('https://api.ocr.space/parse/image', {
+      method: 'POST',
+      headers: { apikey: API_KEY },
+      body,
+    });
+
+    if (!resp.ok) throw new Error('OCR API error ' + resp.status);
+    const json = await resp.json();
+    tick(100, 'Done!');
+
+    if (json.IsErroredOnProcessing) throw new Error(json.ErrorMessage?.[0] || 'OCR failed');
+    return json.ParsedResults?.[0]?.ParsedText || '';
+  }
+
+  function parseNutritionLabel(text) {
+    const skip = [
+      /supplement\s+facts/i, /serving\s+size/i, /servings?\s+per/i,
+      /amount\s+per/i, /daily\s+value/i, /%\s*dv/i, /^%\s*daily/i,
+      /not\s+a\s+significant/i, /other\s+ingred/i, /manufactured/i,
+      /distributed/i, /percent\s+daily/i, /based\s+on\s+a\s+2/i,
+      /daily\s+value\s+not/i, /suggested\s+use/i, /contains\s+/i,
+      /ingredients:/i, /^\s*[-—_=]+\s*$/, /^\s*[*†+]+\s*$/,
+      /^serving$/i, /^value$/i, /^per$/i, /^amount$/i
+    ];
+    const unitPat = '(mcg|μg|ug|mg|g|IU|international\\s*units?|oz|ml|units?|kcal)';
+    const reInline    = new RegExp(`^(.{2,70}?)\\s+(\\d[\\d,]*(?:\\.\\d+)?)\\s*${unitPat}?\\s*$`, 'i');
+    const reAmountOnly = new RegExp(`^(\\d[\\d,]*(?:\\.\\d+)?)\\s*${unitPat}?\\s*$`, 'i');
+    const endsWithAmt  = new RegExp(`\\d[\\d,]*(?:\\.\\d+)?\\s*${unitPat}\\s*$`, 'i'); // requires a unit to count as "ends with amount"
+
+    const clean = raw => raw
+      .replace(/\s+\d+\s*%[*†]*/g, ' ')   // strip trailing %DV columns
+      .replace(/[†*°•·+]+\s*$/g, '')        // strip trailing daggers / asterisks / "+" (OCR artifact for †)
+      .trim();
+
+    const lines = text.split('\n').map(clean).filter(l => l.length > 1);
+    const nutrients = [];
+    // FIFO queue: names are pushed when seen, popped when a matching amount arrives
+    const nameQueue = [];
+
+    for (const line of lines) {
+      if (skip.some(p => p.test(line))) continue;
+
+      // 1. Inline calorie ("Calories 25" on one line)
+      const calMatch = line.match(/^(calories(?:\s+from\s+[\w-]+)?)\s+(\d[\d,]*)/i);
+      if (calMatch) {
+        const amount = parseFloat(calMatch[2].replace(/,/g, ''));
+        if (!isNaN(amount)) {
+          nutrients.push({ name: calMatch[1].trim(), amount, unit: 'kcal', raw: line });
+          continue;
+        }
+      }
+
+      // 2. Name + amount (+ optional unit) on the same line — e.g. "EPA (...) 1500 mg"
+      const mi = line.match(reInline);
+      if (mi) {
+        const name = mi[1].replace(/[†*°•·+]/g, '').trim();
+        const validName = name.length >= 2
+          && /^[A-Z(]/.test(name)   // must start uppercase — rejects prose like "in a serving of..."
+          && !name.includes(',')     // no commas
+          && !/[.;]$/.test(name);   // no trailing period/semicolon
+        if (validName) {
+          const amount = parseFloat(mi[2].replace(/,/g, ''));
+          if (!isNaN(amount)) {
+            nutrients.push({ name, amount, unit: (mi[3] || '').trim(), raw: line });
+            continue;
+          }
+        }
+      }
+
+      // 3. Standalone amount line — pair with the oldest queued name (FIFO)
+      //    Handles: names block → values block (e.g. Calories/Total Fat/Protein then 25/2.5g/1g)
+      //    AND:     interleaved name → amount pairs (Fish Oil then 2500 mg)
+      const ma = line.match(reAmountOnly);
+      if (ma) {
+        const amount = parseFloat(ma[1].replace(/,/g, ''));
+        if (!isNaN(amount) && nameQueue.length > 0) {
+          const name = nameQueue.shift();
+          const unit = ma[2] ? ma[2].trim() : (/calorie/i.test(name) ? 'kcal' : '');
+          nutrients.push({ name, amount, unit, raw: name + ' ' + line });
+        }
+        continue;
+      }
+
+      // 4. Name-only line → push to queue
+      //    Nutrient names always start with an uppercase letter, never contain
+      //    commas, and don't end with a period — this excludes prose sentences
+      //    like "meal, or as recommended..." and "practitioner."
+      const looksLikeName = /^[A-Z(]/.test(line)
+        && !endsWithAmt.test(line)
+        && !line.includes(',')
+        && !/[.;]$/.test(line)
+        && line.length >= 3 && line.length <= 72;
+      if (looksLikeName) {
+        nameQueue.push(line.replace(/[†*°•·+]/g, '').trim());
+      }
+    }
+    return nutrients;
+  }
+
+  function parseScaleData(text) {
+    const t = text.toLowerCase();
+    const r = {};
+    const wm = t.match(/(\d+(?:\.\d+)?)\s*(lbs?|kg)(?![^\n]*(?:muscle|lean|fat))/);
+    if (wm) { r.weight=parseFloat(wm[1]); r.weightUnit=wm[2].startsWith('k')?'kg':'lbs'; }
+    const bf = t.match(/(?:body\s*fat|fat\s*%)[^\d]*(\d+(?:\.\d+)?)/);
+    if (bf) r.bodyFat=parseFloat(bf[1]);
+    const lm = t.match(/(?:lean|muscle|skeletal)[^\d]*(\d+(?:\.\d+)?)\s*(lbs?|kg)/);
+    if (lm) r.leanMass=parseFloat(lm[1]);
+    const vf = t.match(/visceral[^\d]*(\d+(?:\.\d+)?)/);
+    if (vf) r.visceralFat=parseFloat(vf[1]);
+    const bm = t.match(/bmi[^\d]*(\d+(?:\.\d+)?)/);
+    if (bm) r.bmi=parseFloat(bm[1]);
+    return r;
+  }
+
+  return { recognize, parseNutritionLabel, parseScaleData };
+})();
+
+// ============================================================
+// HELPERS
+// ============================================================
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function isCalorie(n) { return /calorie/i.test(n.name); }
+function sortNutrients(arr) { return [...arr].sort((a,b) => isCalorie(b)-isCalorie(a)); }
+function nutrientRow(n) {
+  const cal = isCalorie(n);
+  return `<div class="nutrient-total-row${cal?' calorie-row':''}"><span class="nutrient-total-name">${esc(n.name)}</span><span class="nutrient-total-val">${fmt(n.amount)}${n.unit?' '+esc(n.unit):''}</span></div>`;
+}
+function fmt(n) { return typeof n==='number' ? (n%1===0?n:n.toFixed(1)) : n; }
+function todayStr() { return new Date().toISOString().split('T')[0]; }
+function dateObj(str) { return new Date(str+'T12:00:00'); }
+function isScheduledOn(supp, date) {
+  const dow = (date instanceof Date ? date : dateObj(date)).getDay();
+  return (supp.daysOfWeek||[0,1,2,3,4,5,6]).includes(dow);
+}
+function isPepScheduledOn(pep, date) {
+  if (pep.vialEndedEarly) return false;
+  const d = date instanceof Date ? date : dateObj(date);
+  const start = dateObj(pep.cycleStartDate || (pep.createdAt||'').split('T')[0]);
+  if (d < start) return false;
+  if (pep.frequencyType==='daily') return true;
+  if (pep.frequencyType==='weekly') return (pep.daysOfWeek||[]).includes(d.getDay());
+  if (pep.frequencyType==='cadence') {
+    const diff = Math.floor((d - start)/86400000);
+    const cycle = (pep.cadenceOn||5)+(pep.cadenceOff||2);
+    return (diff % cycle) < (pep.cadenceOn||5);
+  }
+  return false;
+}
+function isPepEffectivelyTaken(pep, dateStr) {
+  const explicit = Store.getLog(dateStr).peptides?.[pep.id];
+  if (explicit !== undefined) return explicit.taken === true;
+  return dateStr < todayStr(); // past scheduled days default to taken
+}
+function freqLabel(pep) {
+  const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  if (pep.frequencyType==='daily') return 'Daily';
+  if (pep.frequencyType==='weekly') return (pep.daysOfWeek||[]).map(d=>days[d]).join(', ');
+  if (pep.frequencyType==='cadence') return `${pep.cadenceOn||5} on / ${pep.cadenceOff||2} off`;
+  return '';
+}
+function calcUnits(mgPowder, bacMl, doseMcg) {
+  if (!mgPowder||!bacMl||!doseMcg) return null;
+  const conc = (mgPowder*1000)/bacMl;
+  const vol = doseMcg/conc;
+  return { units: Math.round(vol*100*10)/10, conc, vol };
+}
+function calcTotalDoses(mg, dose) { if(!mg||!dose) return null; return Math.floor((mg*1000)/dose); }
+function getDosesUsed(pepId) {
+  const pep = Store.getPeps().find(p=>p.id===pepId);
+  if (!pep) return 0;
+  const start = dateObj(pep.cycleStartDate || (pep.createdAt||'').split('T')[0]);
+  const yesterday = new Date(); yesterday.setDate(yesterday.getDate()-1);
+  let count = 0;
+  const cur = new Date(start);
+  while (cur <= yesterday) {
+    const ds = cur.toISOString().split('T')[0];
+    if (isPepScheduledOn(pep, cur)) {
+      const explicit = Store.getLog(ds).peptides?.[pepId];
+      if (explicit === undefined || explicit.taken === true) count++;
+    }
+    cur.setDate(cur.getDate()+1);
+  }
+  return count;
+}
+function getCycleWeeks(pep) {
+  if (pep.cycleWeeksOverride!=null) return pep.cycleWeeksOverride;
+  const start = dateObj(pep.cycleStartDate||(pep.createdAt||'').split('T')[0]);
+  return Math.floor((new Date()-start)/(7*86400000));
+}
+function getRemainingDoses(pep) {
+  if (pep.remainingDosesOverride!=null) return pep.remainingDosesOverride;
+  const total = calcTotalDoses(pep.mgPowder, pep.doseMcg);
+  if (total===null) return null;
+  return Math.max(0, total - getDosesUsed(pep.id));
+}
+
+const COLORS = ['#0080C6','#FFB612','#4FC3F7','#FFA000','#29B6F6','#FF8F00','#81D4FA','#FFCA28','#4DD0E1','#FF7043','#AB47BC','#66BB6A'];
+function getNextColor() {
+  const used = Store.getPeps().map(p=>p.color);
+  return COLORS.find(c=>!used.includes(c)) || COLORS[Store.getPeps().length % COLORS.length];
+}
+
+const MON = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const MON3 = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const DOW = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+function toast(msg, type='') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show' + (type ? ' '+type : '');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 2800);
+}
+
+// ============================================================
+// TODAY / CHECK-IN
+// ============================================================
+let todayPageDate = todayStr();
+
+function renderToday(dateStr) {
+  if (dateStr) todayPageDate = dateStr;
+  const date = dateObj(todayPageDate);
+  const log = Store.getLog(todayPageDate);
+  const supps = Store.getSupps().filter(s => isScheduledOn(s, date));
+  const peps = Store.getPeps().filter(p => isPepScheduledOn(p, date));
+  const isToday = todayPageDate === todayStr();
+
+  const allDone = supps.length+peps.length > 0
+    && supps.every(s=>log.supplements[s.id]?.taken)
+    && peps.every(p=>log.peptides[p.id]?.taken);
+
+  const dayLabel = `${DOW[date.getDay()]}, ${MON3[date.getMonth()]} ${date.getDate()}`;
+
+  let html = `
+    <div class="header-row">
+      <h2 class="page-title">Daily Check-in</h2>
+    </div>
+    <div class="date-nav" style="margin-bottom:16px">
+      <button class="btn-icon" id="prev-day">&#8249;</button>
+      <div style="text-align:center">
+        <div style="font-size:17px;font-weight:700">${dayLabel}</div>
+        ${!isToday ? `<button class="btn-link" id="goto-today" style="font-size:12px">← Back to today</button>` : ''}
+      </div>
+      <button class="btn-icon" id="next-day">&#8250;</button>
+    </div>
+    ${allDone ? '<div class="all-done-badge">All done for today! ✓</div><br>' : ''}
+  `;
+
+  if (peps.length > 0) {
+    const takenCount = peps.filter(p=>log.peptides[p.id]?.taken).length;
+    html += `
+      <div class="section">
+        <div class="section-header">
+          <span class="section-title">Peptides</span>
+          <span class="count-badge">${takenCount}/${peps.length}</span>
+        </div>
+        <div class="checkin-list">
+          ${peps.map(p => {
+            const taken = log.peptides[p.id]?.taken || false;
+            const c = calcUnits(p.mgPowder, p.bacMl, p.doseMcg);
+            return `<div class="checkin-row ${taken?'taken':''}">
+              <label class="checkin-label">
+                <input type="checkbox" class="pep-cb" data-id="${p.id}" ${taken?'checked':''}>
+                <span class="checkmark"></span>
+                <div class="checkin-info">
+                  <span class="checkin-name"><span class="pep-dot" style="background:${p.color}"></span>${esc(p.name)}</span>
+                  ${c ? `<span class="checkin-sub">${p.doseMcg} mcg · ${c.units} units</span>` : `<span class="checkin-sub">${freqLabel(p)}</span>`}
+                </div>
+              </label>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+  }
+
+  if (supps.length > 0) {
+    const takenCount = supps.filter(s=>log.supplements[s.id]?.taken).length;
+    html += `
+      <div class="section">
+        <div class="section-header">
+          <span class="section-title">Supplements</span>
+          <span class="count-badge">${takenCount}/${supps.length}</span>
+        </div>
+        <div class="checkin-list">
+          ${supps.map(s => {
+            const slog = log.supplements[s.id]||{taken:false,extraDoses:0};
+            const extra = slog.extraDoses||0;
+            return `<div class="checkin-row ${slog.taken?'taken':''}">
+              <label class="checkin-label">
+                <input type="checkbox" class="supp-cb" data-id="${s.id}" ${slog.taken?'checked':''}>
+                <span class="checkmark"></span>
+                <div class="checkin-info">
+                  <span class="checkin-name">${esc(s.name)}</span>
+                  ${s.brand ? `<span class="checkin-sub">${esc(s.brand)}</span>` : ''}
+                </div>
+              </label>
+              <button class="btn-extra extra-btn" data-id="${s.id}">${extra>0?'+'+extra+' extra':'+ extra'}</button>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+  }
+
+  if (supps.length === 0 && peps.length === 0) {
+    html += `<div class="empty-state"><div class="empty-icon">💊</div><p>Nothing scheduled today.</p><p class="muted" style="font-size:13px;margin-top:8px">Add items from the Stack tab.</p></div>`;
+  }
+
+  // Nutrient totals for today
+  if (supps.length > 0) {
+    const totals = {};
+    for (const s of supps) {
+      const sl = log.supplements[s.id]||{taken:false,extraDoses:0};
+      const doses = (sl.taken?1:0)+(sl.extraDoses||0);
+      if (!doses) continue;
+      for (const n of (s.nutrients||[])) {
+        const key = n.name.toLowerCase();
+        if (!totals[key]) totals[key]={name:n.name,amount:0,unit:n.unit};
+        totals[key].amount += n.amount*doses;
+      }
+    }
+    const vals = Object.values(totals);
+    if (vals.length > 0) {
+      html += `<div class="section">
+        <div class="section-header"><span class="section-title">Nutrient Totals</span><span class="muted small">taken doses only</span></div>
+        <div class="nutrient-totals">${sortNutrients(vals).map(n=>nutrientRow(n)).join('')}</div>
+      </div>`;
+    }
+  }
+
+  const container = document.getElementById('page-today');
+  container.innerHTML = html;
+
+  document.getElementById('prev-day')?.addEventListener('click',()=>{ const d=dateObj(todayPageDate); d.setDate(d.getDate()-1); renderToday(d.toISOString().split('T')[0]); });
+  document.getElementById('next-day')?.addEventListener('click',()=>{ const d=dateObj(todayPageDate); d.setDate(d.getDate()+1); renderToday(d.toISOString().split('T')[0]); });
+  document.getElementById('goto-today')?.addEventListener('click',()=>renderToday(todayStr()));
+
+  container.querySelectorAll('.pep-cb').forEach(cb=>{
+    cb.addEventListener('change',e=>{ Store.togglePep(todayPageDate,e.target.dataset.id,e.target.checked); renderToday(); });
+  });
+  container.querySelectorAll('.supp-cb').forEach(cb=>{
+    cb.addEventListener('change',e=>{ Store.toggleSupp(todayPageDate,e.target.dataset.id,e.target.checked); renderToday(); });
+  });
+  container.querySelectorAll('.extra-btn').forEach(btn=>{
+    btn.addEventListener('click',e=>showExtraDosesModal(e.target.dataset.id));
+  });
+}
+
+function showExtraDosesModal(suppId) {
+  const supp = Store.getSupps().find(s=>s.id===suppId);
+  if (!supp) return;
+  const log = Store.getLog(todayPageDate);
+  const cur = log.supplements[suppId]?.extraDoses||0;
+  document.getElementById('extra-doses-title').textContent = supp.name;
+  document.getElementById('extra-doses-input').value = cur;
+  const modal = document.getElementById('modal-extra-doses');
+  modal.style.display='flex';
+  document.getElementById('extra-doses-save').onclick=()=>{
+    Store.setExtra(todayPageDate,suppId,document.getElementById('extra-doses-input').value);
+    modal.style.display='none'; renderToday();
+  };
+  document.getElementById('extra-doses-cancel').onclick=()=>modal.style.display='none';
+}
+
+// ============================================================
+// STACK
+// ============================================================
+function renderStack() {
+  const supps = Store.getSupps();
+  const peps = Store.getPeps();
+  const active = peps.filter(p=>!p.vialEndedEarly);
+  const ended = peps.filter(p=>p.vialEndedEarly);
+  const dayPills = (days) => ['Su','Mo','Tu','We','Th','Fr','Sa'].map((d,i)=>`<span class="day-pill ${(days||[0,1,2,3,4,5,6]).includes(i)?'active':''}">${d}</span>`).join('');
+
+  let html = `
+    <div class="header-row">
+      <h2 class="page-title">My Stack</h2>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">
+      <button class="btn-primary" id="add-pep-btn">+ Peptide</button>
+      <button class="btn-secondary" id="add-supp-btn">+ Supplement</button>
+    </div>
+
+    <div class="section">
+      <div class="section-header">
+        <span class="section-title">Peptides</span>
+        <span class="count-badge">${active.length} active</span>
+      </div>
+      ${active.length===0 ? '<p class="muted small">No active peptides.</p>' : active.map(p=>pepCard(p)).join('')}
+      ${ended.length>0?`<details class="ended-section"><summary>Ended vials (${ended.length})</summary>${ended.map(p=>pepCard(p,true)).join('')}</details>`:''}
+    </div>
+
+    <div class="section">
+      <div class="section-header">
+        <span class="section-title">Supplements</span>
+        <span class="count-badge">${supps.length}</span>
+      </div>
+      ${supps.length===0 ? '<p class="muted small">No supplements added yet.</p>' : supps.map(s=>`
+        <div class="card supp-card">
+          <div class="card-header">
+            <div><div class="card-name">${esc(s.name)}</div>${s.brand?`<div class="card-sub">${esc(s.brand)}</div>`:''}</div>
+            <div class="card-actions">
+              <button class="btn-icon supp-edit" data-id="${s.id}">✏️</button>
+              <button class="btn-icon supp-del" data-id="${s.id}">🗑️</button>
+            </div>
+          </div>
+          <div class="card-body">
+            <div class="day-pills">${dayPills(s.daysOfWeek)}</div>
+            ${(s.nutrients||[]).length>0?`<div class="supp-nutrients">${s.nutrients.slice(0,5).map(n=>`<span class="nutrient-chip">${esc(n.name)}: ${n.amount} ${esc(n.unit)}</span>`).join('')}${s.nutrients.length>5?`<span class="nutrient-chip muted">+${s.nutrients.length-5} more</span>`:''}</div>`:''}
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+
+  // Stack-wide nutrient totals
+  const totals = {};
+  for (const s of supps) {
+    for (const n of (s.nutrients||[])) {
+      const k = n.name.toLowerCase();
+      if (!totals[k]) totals[k]={name:n.name,amount:0,unit:n.unit};
+      totals[k].amount += n.amount*(s.servingsPerDay||1);
+    }
+  }
+  const tvals = Object.values(totals);
+  if (tvals.length>0) {
+    html += `<div class="section"><div class="section-header"><span class="section-title">Total Daily Nutrients</span><span class="muted small">full stack</span></div>
+      <div class="nutrient-totals">${sortNutrients(tvals).map(n=>nutrientRow(n)).join('')}</div>
+    </div>`;
+  }
+
+  document.getElementById('page-stack').innerHTML = html;
+
+  document.getElementById('add-pep-btn').addEventListener('click',()=>showPepForm());
+  document.getElementById('add-supp-btn').addEventListener('click',()=>showSuppForm());
+
+  document.querySelectorAll('.pep-edit').forEach(b=>b.addEventListener('click',()=>showPepForm(b.dataset.id)));
+  document.querySelectorAll('.pep-del').forEach(b=>b.addEventListener('click',()=>{
+    if(confirm('Delete this peptide and all history?')){Store.deletePep(b.dataset.id);renderStack();renderToday();}
+  }));
+  document.querySelectorAll('.pep-end').forEach(b=>b.addEventListener('click',()=>endVial(b.dataset.id)));
+  document.querySelectorAll('.pep-cycle').forEach(b=>b.addEventListener('click',()=>showEditCycleModal(b.dataset.id)));
+  document.querySelectorAll('.supp-edit').forEach(b=>b.addEventListener('click',()=>showSuppForm(b.dataset.id)));
+  document.querySelectorAll('.supp-del').forEach(b=>b.addEventListener('click',()=>{
+    if(confirm('Delete this supplement?')){Store.deleteSupp(b.dataset.id);renderStack();renderToday();}
+  }));
+}
+
+function pepCard(pep, isEnded=false) {
+  const c = calcUnits(pep.mgPowder,pep.bacMl,pep.doseMcg);
+  const rem = getRemainingDoses(pep);
+  const total = calcTotalDoses(pep.mgPowder,pep.doseMcg);
+  const weeks = getCycleWeeks(pep);
+  const used = getDosesUsed(pep.id);
+  const pct = total ? Math.min(100,((total-(rem||0))/total)*100) : 0;
+  return `<div class="card pep-card ${isEnded?'ended':''}">
+    <div class="card-header">
+      <div class="pep-card-title">
+        <span class="pep-dot large" style="background:${pep.color||'#0080C6'}"></span>
+        <span class="card-name">${esc(pep.name)}</span>
+        ${isEnded?'<span class="badge-ended">Ended</span>':''}
+      </div>
+      <div class="card-actions">
+        ${!isEnded?`<button class="btn-icon pep-edit" data-id="${pep.id}" title="Edit">✏️</button>`:''}
+        ${!isEnded?`<button class="btn-icon pep-cycle" data-id="${pep.id}" title="Edit Cycle">⚙️</button>`:''}
+        ${!isEnded?`<button class="btn-icon pep-end" data-id="${pep.id}" title="End Vial">🏁</button>`:''}
+        <button class="btn-icon pep-del" data-id="${pep.id}" title="Delete">🗑️</button>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="card-stats">
+        <div class="stat"><span class="stat-label">Dose</span><span class="stat-value">${pep.doseMcg} mcg</span></div>
+        ${c?`<div class="stat"><span class="stat-label">Draw</span><span class="stat-value">${c.units} units</span></div>`:''}
+        <div class="stat"><span class="stat-label">Frequency</span><span class="stat-value">${freqLabel(pep)}</span></div>
+        <div class="stat"><span class="stat-label">Cycle Week</span><span class="stat-value">Week ${weeks}</span></div>
+        ${total!==null?`<div class="stat"><span class="stat-label">Doses Used</span><span class="stat-value">${used} / ${total}</span></div>`:''}
+        ${rem!==null?`<div class="stat ${rem<5?'stat-warning':''}"><span class="stat-label">Remaining</span><span class="stat-value">${rem} doses</span></div>`:''}
+      </div>
+      ${pep.notes?`<p class="card-notes">${esc(pep.notes)}</p>`:''}
+      ${total!==null?`<div class="dose-progress"><div class="dose-progress-bar" style="width:${pct}%"></div></div>`:''}
+    </div>
+  </div>`;
+}
+
+function endVial(id) {
+  if(!confirm('Mark this vial as ended early? It will be removed from your active schedule but history will be preserved.')) return;
+  Store.updatePep(id,{vialEndedEarly:true});
+  renderStack(); renderToday(); renderCal(); toast('Vial marked as ended','success');
+}
+
+function showEditCycleModal(pepId) {
+  const pep = Store.getPeps().find(p=>p.id===pepId);
+  if (!pep) return;
+  document.getElementById('edit-cycle-name').textContent = pep.name;
+  document.getElementById('edit-cycle-start').value = pep.cycleStartDate||'';
+  document.getElementById('edit-cycle-weeks').value = getCycleWeeks(pep);
+  document.getElementById('edit-cycle-remaining').value = getRemainingDoses(pep)??'';
+  const modal = document.getElementById('modal-edit-cycle');
+  modal.style.display='flex';
+  document.getElementById('edit-cycle-save').onclick=()=>{
+    const weeks = document.getElementById('edit-cycle-weeks').value;
+    const rem = document.getElementById('edit-cycle-remaining').value;
+    const start = document.getElementById('edit-cycle-start').value;
+    const u = {cycleStartDate:start};
+    if(weeks!=='') u.cycleWeeksOverride=parseInt(weeks);
+    if(rem!=='') u.remainingDosesOverride=parseInt(rem);
+    Store.updatePep(pepId,u); modal.style.display='none'; renderStack(); toast('Cycle updated','success');
+  };
+  document.getElementById('edit-cycle-cancel').onclick=()=>modal.style.display='none';
+}
+
+// ============================================================
+// ADD SUPPLEMENT FORM
+// ============================================================
+let editingSuppId = null;
+let currentNutrients = [];
+
+function showSuppForm(editId=null) {
+  editingSuppId = editId;
+  currentNutrients = [];
+  const ov = document.getElementById('overlay-supplement');
+  ov.classList.add('active');
+  document.getElementById('supp-form').reset();
+  document.getElementById('supp-overlay-title').textContent = editId ? 'Edit Supplement' : 'Add Supplement';
+  document.querySelectorAll('.day-cb').forEach(cb=>cb.checked=true);
+  document.getElementById('nutrient-list').innerHTML='';
+  document.getElementById('nutrients-section').style.display='none';
+  document.getElementById('supp-preview').style.display='none';
+  document.getElementById('ocr-progress').style.display='none';
+
+  if (editId) {
+    const s = Store.getSupps().find(x=>x.id===editId);
+    if (s) {
+      document.getElementById('supp-name').value=s.name||'';
+      document.getElementById('supp-brand').value=s.brand||'';
+      document.getElementById('supp-servings').value=s.servingsPerDay||1;
+      document.getElementById('supp-notes').value=s.notes||'';
+      (s.daysOfWeek||[0,1,2,3,4,5,6]).forEach(d=>{ const cb=document.querySelector(`.day-cb[value="${d}"]`); if(cb) cb.checked=true; });
+      document.querySelectorAll('.day-cb').forEach(cb=>{ cb.checked=(s.daysOfWeek||[0,1,2,3,4,5,6]).includes(parseInt(cb.value)); });
+      currentNutrients = (s.nutrients||[]).map(n=>({...n}));
+      renderNutrientList();
+      document.getElementById('nutrients-section').style.display='block';
+    }
+  }
+}
+
+function renderNutrientList() {
+  const list = document.getElementById('nutrient-list');
+  list.innerHTML = '';
+  currentNutrients.forEach((n,i) => {
+    const row = document.createElement('div');
+    row.className = 'nutrient-row';
+    row.innerHTML = `
+      <input class="input nutrient-name" type="text" placeholder="Name" value="${esc(String(n.name||''))}">
+      <input class="input nutrient-amount" type="number" step="any" min="0" placeholder="Amt" value="${n.amount!==''&&n.amount!=null?n.amount:''}">
+      <input class="input nutrient-unit" type="text" placeholder="Unit" value="${esc(String(n.unit||''))}">
+      <button class="remove-nutrient" type="button">✕</button>
+    `;
+    row.querySelector('.nutrient-name').addEventListener('input',e=>currentNutrients[i].name=e.target.value);
+    row.querySelector('.nutrient-amount').addEventListener('input',e=>currentNutrients[i].amount=e.target.value);
+    row.querySelector('.nutrient-unit').addEventListener('input',e=>currentNutrients[i].unit=e.target.value);
+    row.querySelector('.remove-nutrient').addEventListener('click',()=>{ currentNutrients.splice(i,1); renderNutrientList(); });
+    list.appendChild(row);
+  });
+}
+
+async function handleSuppImage(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  document.getElementById('supp-preview').src=URL.createObjectURL(file);
+  document.getElementById('supp-preview').style.display='block';
+  document.getElementById('ocr-progress').style.display='block';
+  document.getElementById('ocr-progress-bar').style.width='0%';
+  document.getElementById('ocr-status').textContent='Initializing...';
+  document.getElementById('ocr-debug').style.display='none';
+  try {
+    const text = await OCR.recognize(file,'ocr-progress-bar','ocr-status');
+    // Always show raw OCR output for debugging
+    document.getElementById('ocr-raw-text').textContent = text;
+    document.getElementById('ocr-debug').style.display='block';
+    document.getElementById('ocr-progress').style.display='none';
+    const parsed = OCR.parseNutritionLabel(text);
+    if (parsed.length===0) { toast('No nutrients auto-detected — check raw OCR below or add manually.','warning'); currentNutrients=[{name:'',amount:'',unit:'mg'}]; }
+    else { toast(`Detected ${parsed.length} nutrients — review below`,'success'); currentNutrients=parsed; }
+    renderNutrientList();
+    document.getElementById('nutrients-section').style.display='block';
+  } catch(err) {
+    document.getElementById('ocr-progress').style.display='none';
+    toast('OCR failed — add nutrients manually','error');
+    currentNutrients=[{name:'',amount:'',unit:'mg'}];
+    renderNutrientList();
+    document.getElementById('nutrients-section').style.display='block';
+  }
+}
+
+function saveSupplement() {
+  const name = document.getElementById('supp-name').value.trim();
+  if (!name) { toast('Name is required','error'); return; }
+  const days = [...document.querySelectorAll('.day-cb:checked')].map(cb=>parseInt(cb.value));
+  if (days.length===0) { toast('Select at least one day','error'); return; }
+  const bad = currentNutrients.filter(n=>n.name&&n.name.trim()&&(n.amount===''||n.amount==null||isNaN(n.amount)));
+  if (bad.length>0) { toast(`Enter amounts for: ${bad.map(n=>n.name).join(', ')},'error'`,'error'); return; }
+  const nutrients = currentNutrients.filter(n=>n.name&&n.name.trim()).map(n=>({name:n.name.trim(),amount:parseFloat(n.amount)||0,unit:(n.unit||'').trim()}));
+  const data = {
+    name,
+    brand:document.getElementById('supp-brand').value.trim(),
+    servingsPerDay:parseInt(document.getElementById('supp-servings').value)||1,
+    notes:document.getElementById('supp-notes').value.trim(),
+    daysOfWeek:days, nutrients
+  };
+  if (editingSuppId) { Store.updateSupp(editingSuppId,data); toast('Supplement updated','success'); }
+  else { Store.addSupp(data); toast('Supplement added','success'); }
+  document.getElementById('overlay-supplement').classList.remove('active');
+  renderStack(); renderToday();
+}
+
+// ============================================================
+// ADD PEPTIDE FORM
+// ============================================================
+let editingPepId = null;
+let selectedColor = COLORS[0];
+
+function showPepForm(editId=null) {
+  editingPepId = editId;
+  const ov = document.getElementById('overlay-peptide');
+  ov.classList.add('active');
+  document.getElementById('pep-form').reset();
+  document.getElementById('pep-overlay-title').textContent = editId ? 'Edit Peptide' : 'Add Peptide';
+  document.getElementById('pep-result').style.display='none';
+  document.getElementById('freq-weekly-inputs').style.display='none';
+  document.getElementById('freq-cadence-inputs').style.display='none';
+  document.querySelectorAll('.pep-day-cb').forEach(cb=>cb.checked=false);
+
+  // Color swatches
+  selectedColor = editId ? null : getNextColor();
+  const swatchContainer = document.getElementById('color-swatches');
+  swatchContainer.innerHTML = COLORS.map(c=>`<div class="color-swatch${c===selectedColor?' selected':''}" style="background:${c}" data-color="${c}"></div>`).join('');
+  swatchContainer.querySelectorAll('.color-swatch').forEach(sw=>{
+    sw.addEventListener('click',()=>{
+      selectedColor=sw.dataset.color;
+      swatchContainer.querySelectorAll('.color-swatch').forEach(x=>x.classList.remove('selected'));
+      sw.classList.add('selected');
+      document.getElementById('pep-color').value=selectedColor;
+    });
+  });
+  document.getElementById('pep-color').value=selectedColor||COLORS[0];
+
+  if (editId) {
+    const p = Store.getPeps().find(x=>x.id===editId);
+    if (p) {
+      document.getElementById('pep-name').value=p.name||'';
+      document.getElementById('pep-mg').value=p.mgPowder||'';
+      document.getElementById('pep-bac').value=p.bacMl||'';
+      document.getElementById('pep-dose').value=p.doseMcg||'';
+      document.getElementById('pep-frequency-type').value=p.frequencyType||'daily';
+      document.getElementById('pep-cadence-on').value=p.cadenceOn||5;
+      document.getElementById('pep-cadence-off').value=p.cadenceOff||2;
+      document.getElementById('pep-cycle-start').value=p.cycleStartDate||'';
+      document.getElementById('pep-notes').value=p.notes||'';
+      selectedColor=p.color||COLORS[0];
+      document.getElementById('pep-color').value=selectedColor;
+      swatchContainer.querySelectorAll('.color-swatch').forEach(sw=>{
+        sw.classList.toggle('selected',sw.dataset.color===selectedColor);
+      });
+      if (p.frequencyType==='weekly') {
+        document.getElementById('freq-weekly-inputs').style.display='block';
+        (p.daysOfWeek||[]).forEach(d=>{ const cb=document.querySelector(`.pep-day-cb[value="${d}"]`); if(cb)cb.checked=true; });
+      }
+      if (p.frequencyType==='cadence') document.getElementById('freq-cadence-inputs').style.display='block';
+      runPepCalc();
+    }
+  } else {
+    document.getElementById('pep-cycle-start').value=todayStr();
+  }
+}
+
+function runPepCalc() {
+  const mg=parseFloat(document.getElementById('pep-mg').value);
+  const bac=parseFloat(document.getElementById('pep-bac').value);
+  const dose=parseFloat(document.getElementById('pep-dose').value);
+  const rd=document.getElementById('pep-result');
+  const c=calcUnits(mg,bac,dose);
+  const total=calcTotalDoses(mg,dose);
+  if (!c){rd.style.display='none';return;}
+  rd.style.display='block';
+  rd.innerHTML=`<div class="calc-result-grid">
+    <div class="calc-item"><span class="calc-label">Concentration</span><span class="calc-value">${Math.round(c.conc)} mcg/mL</span></div>
+    <div class="calc-item"><span class="calc-label">Volume/Dose</span><span class="calc-value">${(c.vol).toFixed(3)} mL</span></div>
+    <div class="calc-item highlight"><span class="calc-label">Units to Draw</span><span class="calc-value">${c.units} units</span></div>
+    <div class="calc-item"><span class="calc-label">Total Doses</span><span class="calc-value">${total??'—'}</span></div>
+  </div>`;
+}
+
+function savePeptide() {
+  const name=document.getElementById('pep-name').value.trim();
+  if(!name){toast('Name is required','error');return;}
+  const freqType=document.getElementById('pep-frequency-type').value;
+  let daysOfWeek=[];
+  if(freqType==='weekly'){
+    daysOfWeek=[...document.querySelectorAll('.pep-day-cb:checked')].map(cb=>parseInt(cb.value));
+    if(daysOfWeek.length===0){toast('Select at least one injection day','error');return;}
+  }
+  const data={
+    name,
+    mgPowder:parseFloat(document.getElementById('pep-mg').value)||0,
+    bacMl:parseFloat(document.getElementById('pep-bac').value)||0,
+    doseMcg:parseFloat(document.getElementById('pep-dose').value)||0,
+    frequencyType:freqType, daysOfWeek,
+    cadenceOn:parseInt(document.getElementById('pep-cadence-on').value)||5,
+    cadenceOff:parseInt(document.getElementById('pep-cadence-off').value)||2,
+    cycleStartDate:document.getElementById('pep-cycle-start').value||todayStr(),
+    color:document.getElementById('pep-color').value||COLORS[0],
+    notes:document.getElementById('pep-notes').value.trim(),
+    vialEndedEarly:false
+  };
+  if(editingPepId){
+    const ex=Store.getPeps().find(p=>p.id===editingPepId);
+    Store.updatePep(editingPepId,{...data,vialEndedEarly:ex?.vialEndedEarly||false});
+    toast('Peptide updated','success');
+  } else {
+    Store.addPep(data); toast('Peptide added','success');
+  }
+  document.getElementById('overlay-peptide').classList.remove('active');
+  renderStack(); renderToday(); renderCal();
+}
+
+// ============================================================
+// CALENDAR
+// ============================================================
+let calMode = 'month';
+let calDate = new Date();
+let calFilter = 'all';
+
+function renderCal() {
+  const peps = Store.getPeps();
+  const container = document.getElementById('page-calendar');
+  container.innerHTML = `
+    <div class="header-row">
+      <h2 class="page-title">Calendar</h2>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+      <div class="view-toggle">
+        <button class="view-btn ${calMode==='month'?'active':''}" data-view="month">Month</button>
+        <button class="view-btn ${calMode==='week'?'active':''}" data-view="week">Week</button>
+      </div>
+      <select class="filter-select" id="cal-filter">
+        <option value="all">All Peptides</option>
+        ${peps.filter(p=>!p.vialEndedEarly).map(p=>`<option value="${p.id}" ${calFilter===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}
+      </select>
+    </div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding:0 4px">
+      <button class="btn-icon" id="cal-prev" style="font-size:22px;width:44px;height:44px;color:var(--blue);background:transparent">‹</button>
+      <span id="cal-period" style="font-size:16px;font-weight:700"></span>
+      <button class="btn-icon" id="cal-next" style="font-size:22px;width:44px;height:44px;color:var(--blue);background:transparent">›</button>
+    </div>
+    <div id="cal-grid"></div>
+  `;
+
+  container.querySelectorAll('.view-btn').forEach(b=>b.addEventListener('click',()=>{calMode=b.dataset.view;renderCal();}));
+  document.getElementById('cal-filter').addEventListener('change',e=>{calFilter=e.target.value;drawCalGrid();});
+  document.getElementById('cal-prev').addEventListener('click',()=>{
+    if(calMode==='month') calDate=new Date(calDate.getFullYear(),calDate.getMonth()-1,1);
+    else calDate=new Date(calDate.getTime()-7*86400000);
+    drawCalGrid();
+  });
+  document.getElementById('cal-next').addEventListener('click',()=>{
+    if(calMode==='month') calDate=new Date(calDate.getFullYear(),calDate.getMonth()+1,1);
+    else calDate=new Date(calDate.getTime()+7*86400000);
+    drawCalGrid();
+  });
+  drawCalGrid();
+}
+
+function drawCalGrid() {
+  const allPeps = Store.getPeps();
+  const peps = calFilter==='all' ? allPeps.filter(p=>!p.vialEndedEarly) : allPeps.filter(p=>p.id===calFilter);
+  const today = todayStr();
+
+  if (calMode==='month') {
+    const y=calDate.getFullYear(), m=calDate.getMonth();
+    document.getElementById('cal-period').textContent=`${MON[m]} ${y}`;
+    const first=new Date(y,m,1).getDay();
+    const days=new Date(y,m+1,0).getDate();
+    let html='<div class="cal-grid month-grid">';
+    ['Su','Mo','Tu','We','Th','Fr','Sa'].forEach(d=>html+=`<div class="cal-header-cell">${d}</div>`);
+    for(let i=0;i<first;i++) html+='<div class="cal-cell empty"></div>';
+    for(let d=1;d<=days;d++){
+      const ds=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const do2=dateObj(ds);
+      const log=Store.getLog(ds);
+      const sched=peps.filter(p=>isPepScheduledOn(p,do2));
+      const taken=sched.filter(p=>isPepEffectivelyTaken(p,ds));
+      html+=`<div class="cal-cell ${ds===today?'today':''}" data-date="${ds}">
+        <span class="cal-day-num">${d}</span>
+        <div class="cal-dots">${sched.map(p=>`<span class="cal-dot ${taken.find(t=>t.id===p.id)?'taken':'pending'}" style="background:${p.color}" title="${esc(p.name)}"></span>`).join('')}</div>
+      </div>`;
+    }
+    html+='</div>';
+    document.getElementById('cal-grid').innerHTML=html;
+  } else {
+    // Week view
+    const start=new Date(calDate);
+    start.setDate(start.getDate()-start.getDay());
+    const wdays=[];
+    for(let i=0;i<7;i++){const d=new Date(start);d.setDate(d.getDate()+i);wdays.push(d);}
+    document.getElementById('cal-period').textContent=`${MON3[wdays[0].getMonth()]} ${wdays[0].getDate()} – ${MON3[wdays[6].getMonth()]} ${wdays[6].getDate()}, ${wdays[6].getFullYear()}`;
+    const dayNames=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    let html='<div class="cal-grid week-grid">';
+    for(const d of wdays){
+      const ds=d.toISOString().split('T')[0];
+      const log=Store.getLog(ds);
+      const sched=peps.filter(p=>isPepScheduledOn(p,d));
+      const taken=sched.filter(p=>isPepEffectivelyTaken(p,ds));
+      html+=`<div class="cal-cell week-cell ${ds===today?'today':''}" data-date="${ds}">
+        <div class="week-cell-header"><span class="week-day-name">${dayNames[d.getDay()]}</span><span class="week-day-num">${d.getDate()}</span></div>
+        <div class="week-peptides">${sched.length===0?'<span class="muted" style="font-size:11px">Rest</span>':sched.map(p=>`<div class="week-pep-row ${taken.find(t=>t.id===p.id)?'taken':''}"><span class="cal-dot" style="background:${p.color}"></span><span class="week-pep-name">${esc(p.name)}</span></div>`).join('')}</div>
+      </div>`;
+    }
+    html+='</div>';
+    document.getElementById('cal-grid').innerHTML=html;
+  }
+
+  document.querySelectorAll('.cal-cell[data-date]').forEach(cell=>{
+    cell.addEventListener('click',()=>showDayDetail(cell.dataset.date));
+  });
+}
+
+function showDayDetail(dateStr) {
+  const date=dateObj(dateStr);
+  const log=Store.getLog(dateStr);
+  const peps=Store.getPeps().filter(p=>isPepScheduledOn(p,date));
+  document.getElementById('day-detail-title').textContent=`${DOW[date.getDay()]}, ${MON3[date.getMonth()]} ${date.getDate()}`;
+  const body=document.getElementById('day-detail-body');
+  if(peps.length===0){body.innerHTML='<p class="muted">No peptides scheduled this day.</p>';}
+  else {
+    body.innerHTML=`<div class="day-detail-list">${peps.map(p=>{
+      const effectiveTaken=isPepEffectivelyTaken(p,dateStr);
+      const c=calcUnits(p.mgPowder,p.bacMl,p.doseMcg);
+      return `<div class="day-detail-row">
+        <div class="day-detail-info">
+          <span class="pep-dot large" style="background:${p.color}"></span>
+          <div>
+            <div class="day-detail-name">${esc(p.name)}</div>
+            <div class="day-detail-sub">${p.doseMcg} mcg${c?` · ${c.units} units`:''} · ${freqLabel(p)}</div>
+          </div>
+        </div>
+        <div class="taken-toggle ${effectiveTaken?'taken':''}" data-id="${p.id}" data-date="${dateStr}">${effectiveTaken?'✓ Taken':'○ Pending'}</div>
+      </div>`;
+    }).join('')}</div>`;
+    body.querySelectorAll('.taken-toggle').forEach(el=>{
+      el.addEventListener('click',()=>{
+        const isTaken=el.classList.contains('taken');
+        Store.togglePep(el.dataset.date,el.dataset.id,!isTaken);
+        el.classList.toggle('taken',!isTaken);
+        el.textContent=!isTaken?'✓ Taken':'○ Pending';
+        drawCalGrid(); renderToday();
+      });
+    });
+  }
+  document.getElementById('overlay-day-detail').classList.add('active');
+}
+
+// ============================================================
+// METRICS
+// ============================================================
+let editingMetricId = null;
+
+function renderMetrics() {
+  const metrics=Store.getMetrics().slice().reverse();
+  const container=document.getElementById('page-metrics');
+  container.innerHTML=`
+    <div class="header-row">
+      <h2 class="page-title">Body Metrics</h2>
+      <button class="btn-primary" id="add-metric-btn">+ Add</button>
+    </div>
+    ${metrics.length>1?`
+      <div class="section">
+        <div class="section-header"><span class="section-title">Progress</span></div>
+        <div class="chart-tabs">
+          <button class="chart-tab active" data-m="weight">Weight</button>
+          <button class="chart-tab" data-m="bodyFat">Body Fat %</button>
+          <button class="chart-tab" data-m="leanMass">Lean Mass</button>
+          <button class="chart-tab" data-m="visceralFat">Visceral Fat</button>
+        </div>
+        <canvas id="metrics-chart" height="200"></canvas>
+      </div>
+    `:''}
+    <div class="section">
+      <div class="section-title" style="margin-bottom:12px">History</div>
+      ${metrics.length===0?'<p class="muted small">No measurements yet.</p>':
+        `<div class="metrics-list">${metrics.map(m=>{
+          const d=dateObj(m.date);
+          return `<div class="metric-row">
+            <div class="metric-date">${MON3[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}</div>
+            <div class="metric-values">
+              ${m.weight!=null?`<span class="metric-chip">${m.weight} ${m.weightUnit||'lbs'}</span>`:''}
+              ${m.bodyFat!=null?`<span class="metric-chip">${m.bodyFat}% BF</span>`:''}
+              ${m.leanMass!=null?`<span class="metric-chip">${m.leanMass} lean</span>`:''}
+              ${m.visceralFat!=null?`<span class="metric-chip">VF:${m.visceralFat}</span>`:''}
+              ${m.bmi!=null?`<span class="metric-chip">BMI:${m.bmi}</span>`:''}
+            </div>
+            <div class="metric-actions">
+              <button class="btn-icon m-edit" data-id="${m.id}">✏️</button>
+              <button class="btn-icon m-del" data-id="${m.id}">🗑️</button>
+            </div>
+          </div>`;
+        }).join('')}</div>`}
+    </div>
+  `;
+
+  document.getElementById('add-metric-btn')?.addEventListener('click',()=>showMetricForm());
+  container.querySelectorAll('.m-del').forEach(b=>b.addEventListener('click',()=>{if(confirm('Delete?')){Store.deleteMetric(b.dataset.id);renderMetrics();}}));
+  container.querySelectorAll('.m-edit').forEach(b=>b.addEventListener('click',()=>showMetricForm(b.dataset.id)));
+  container.querySelectorAll('.chart-tab').forEach(tab=>{
+    tab.addEventListener('click',()=>{
+      container.querySelectorAll('.chart-tab').forEach(t=>t.classList.remove('active'));
+      tab.classList.add('active');
+      drawMetricChart(tab.dataset.m);
+    });
+  });
+  if(metrics.length>1) drawMetricChart('weight');
+}
+
+function drawMetricChart(key) {
+  const canvas=document.getElementById('metrics-chart');
+  if(!canvas) return;
+  const data=Store.getMetrics().filter(m=>m[key]!=null);
+  const ctx=canvas.getContext('2d');
+  const W=canvas.offsetWidth||320;
+  canvas.width=W; canvas.height=200;
+  const H=200;
+  if(data.length<2){ctx.fillStyle='#8FA8C8';ctx.font='13px sans-serif';ctx.textAlign='center';ctx.fillText('Need 2+ data points',W/2,100);return;}
+  const vals=data.map(m=>m[key]);
+  const mn=Math.min(...vals), mx=Math.max(...vals), rng=mx-mn||1;
+  const pad={top:20,right:16,bottom:36,left:48};
+  const pw=W-pad.left-pad.right, ph=H-pad.top-pad.bottom;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#111928'; ctx.fillRect(0,0,W,H);
+  // Grid
+  for(let i=0;i<=4;i++){
+    const y=pad.top+(ph/4)*i;
+    ctx.strokeStyle='#1E3050'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(pad.left,y); ctx.lineTo(W-pad.right,y); ctx.stroke();
+    ctx.fillStyle='#8FA8C8'; ctx.font='10px sans-serif'; ctx.textAlign='right';
+    ctx.fillText((mx-(rng/4)*i).toFixed(1),pad.left-4,y+4);
+  }
+  // Line
+  ctx.beginPath(); ctx.strokeStyle='#0080C6'; ctx.lineWidth=2; ctx.lineJoin='round';
+  data.forEach((m,i)=>{
+    const x=pad.left+(i/(data.length-1))*pw;
+    const y=pad.top+((mx-m[key])/rng)*ph;
+    i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+  });
+  ctx.stroke();
+  // Fill
+  ctx.lineTo(pad.left+pw,pad.top+ph); ctx.lineTo(pad.left,pad.top+ph); ctx.closePath();
+  ctx.fillStyle='rgba(0,128,198,0.12)'; ctx.fill();
+  // Points
+  data.forEach((m,i)=>{
+    const x=pad.left+(i/(data.length-1))*pw;
+    const y=pad.top+((mx-m[key])/rng)*ph;
+    ctx.beginPath(); ctx.arc(x,y,4,0,Math.PI*2);
+    ctx.fillStyle='#FFB612'; ctx.fill();
+  });
+  // X labels
+  ctx.fillStyle='#8FA8C8'; ctx.font='10px sans-serif';
+  ctx.textAlign='left'; ctx.fillText(fmtDate(data[0].date),pad.left,H-8);
+  ctx.textAlign='right'; ctx.fillText(fmtDate(data[data.length-1].date),W-pad.right,H-8);
+}
+function fmtDate(ds){const d=dateObj(ds);return `${MON3[d.getMonth()]} ${d.getDate()}`;}
+
+function showMetricForm(editId=null) {
+  editingMetricId=editId;
+  document.getElementById('metric-form').reset();
+  document.getElementById('metric-preview').style.display='none';
+  document.getElementById('metric-ocr-progress').style.display='none';
+  document.getElementById('metric-ocr-status').style.display='none';
+  document.getElementById('metric-date').value=todayStr();
+  if(editId){
+    const m=Store.getMetrics().find(x=>x.id===editId);
+    if(m){
+      document.getElementById('metric-date').value=m.date||'';
+      document.getElementById('metric-weight').value=m.weight??'';
+      document.getElementById('metric-unit').value=m.weightUnit||'lbs';
+      document.getElementById('metric-bodyfat').value=m.bodyFat??'';
+      document.getElementById('metric-lean').value=m.leanMass??'';
+      document.getElementById('metric-visceral').value=m.visceralFat??'';
+      document.getElementById('metric-bmi').value=m.bmi??'';
+    }
+  }
+  document.getElementById('overlay-metric').classList.add('active');
+}
+
+async function handleScaleImage(e) {
+  const file=e.target.files[0];
+  if(!file) return;
+  document.getElementById('metric-preview').src=URL.createObjectURL(file);
+  document.getElementById('metric-preview').style.display='block';
+  document.getElementById('metric-ocr-progress').style.display='block';
+  document.getElementById('metric-progress-bar').style.width='0%';
+  document.getElementById('metric-ocr-progress-status').textContent='Initializing...';
+  try {
+    const text=await OCR.recognize(file,'metric-progress-bar','metric-ocr-progress-status');
+    document.getElementById('metric-ocr-progress').style.display='none';
+    const d=OCR.parseScaleData(text);
+    if(d.weight!=null) document.getElementById('metric-weight').value=d.weight;
+    if(d.weightUnit) document.getElementById('metric-unit').value=d.weightUnit;
+    if(d.bodyFat!=null) document.getElementById('metric-bodyfat').value=d.bodyFat;
+    if(d.leanMass!=null) document.getElementById('metric-lean').value=d.leanMass;
+    if(d.visceralFat!=null) document.getElementById('metric-visceral').value=d.visceralFat;
+    if(d.bmi!=null) document.getElementById('metric-bmi').value=d.bmi;
+    const cnt=Object.keys(d).filter(k=>k!=='weightUnit').length;
+    document.getElementById('metric-ocr-status').style.display='block';
+    document.getElementById('metric-ocr-status').textContent=cnt>0?`Detected ${cnt} value(s) — review below`:'No values detected — enter manually';
+    toast(cnt>0?`Detected ${cnt} metric(s)`:'No metrics detected — enter manually',cnt>0?'success':'warning');
+  } catch(err){
+    document.getElementById('metric-ocr-progress').style.display='none';
+    document.getElementById('metric-ocr-status').style.display='block';
+    document.getElementById('metric-ocr-status').textContent='OCR failed — enter manually';
+    toast('OCR failed','error');
+  }
+}
+
+function saveMetric() {
+  const date=document.getElementById('metric-date').value;
+  if(!date){toast('Date required','error');return;}
+  const d={date,weightUnit:document.getElementById('metric-unit').value};
+  const w=document.getElementById('metric-weight').value;
+  const bf=document.getElementById('metric-bodyfat').value;
+  const lm=document.getElementById('metric-lean').value;
+  const vf=document.getElementById('metric-visceral').value;
+  const bmi=document.getElementById('metric-bmi').value;
+  if(w) d.weight=parseFloat(w);
+  if(bf) d.bodyFat=parseFloat(bf);
+  if(lm) d.leanMass=parseFloat(lm);
+  if(vf) d.visceralFat=parseFloat(vf);
+  if(bmi) d.bmi=parseFloat(bmi);
+  if(editingMetricId){Store.updateMetric(editingMetricId,d);toast('Updated','success');}
+  else{Store.addMetric(d);toast('Measurement saved','success');}
+  document.getElementById('overlay-metric').classList.remove('active');
+  renderMetrics();
+}
+
+// ============================================================
+// EXPORT (CSV)
+// ============================================================
+function downloadCSV(filename, rows) {
+  const csv=rows.map(r=>r.map(c=>{const s=String(c??'');return s.includes(',')||s.includes('"')||s.includes('\n')?`"${s.replace(/"/g,'""')}"`:s;}).join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+  a.download=filename; a.click();
+}
+
+function exportLogs() {
+  const logs=Store.getLogs();
+  const supps=Store.getSupps();
+  const peps=Store.getPeps();
+  const rows=[['Date','Type','Name','Taken','Extra Doses','Dose (mcg)','Units']];
+  const dates=Object.keys(logs).sort();
+  for(const date of dates){
+    const log=logs[date];
+    for(const s of supps){if(log.supplements[s.id]){const sl=log.supplements[s.id];rows.push([date,'Supplement',s.name,sl.taken?'Yes':'No',sl.extraDoses||0,'','']);}}
+    for(const p of peps){if(log.peptides[p.id]){const pl=log.peptides[p.id];const c=calcUnits(p.mgPowder,p.bacMl,p.doseMcg);rows.push([date,'Peptide',p.name,pl.taken?'Yes':'No','',p.doseMcg,c?c.units:'']);}}
+  }
+  downloadCSV('stack-logs.csv',rows);
+  toast('Logs exported','success');
+}
+
+function exportMetrics() {
+  const rows=[['Date','Weight','Unit','Body Fat %','Lean Mass','Visceral Fat','BMI']];
+  for(const m of Store.getMetrics()){rows.push([m.date,m.weight??'',m.weightUnit||'lbs',m.bodyFat??'',m.leanMass??'',m.visceralFat??'',m.bmi??'']);}
+  downloadCSV('body-metrics.csv',rows);
+  toast('Metrics exported','success');
+}
+
+function exportStack() {
+  const rows=[['Type','Name','Brand','Days','Frequency','Dose (mcg)','Color','Cycle Start','Notes','Nutrients']];
+  for(const s of Store.getSupps()){
+    const nutrients=s.nutrients?.map(n=>`${n.name}:${n.amount}${n.unit}`).join('; ')||'';
+    rows.push(['Supplement',s.name,s.brand||'',(s.daysOfWeek||[0,1,2,3,4,5,6]).join(','),'','','','',(s.notes||''),nutrients]);
+  }
+  for(const p of Store.getPeps()){
+    rows.push(['Peptide',p.name,'',freqLabel(p),freqLabel(p),p.doseMcg,p.color||'',p.cycleStartDate||'',(p.notes||''),'']);
+  }
+  downloadCSV('stack.csv',rows);
+  toast('Stack exported','success');
+}
+
+// ============================================================
+// NAVIGATION & INIT
+// ============================================================
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.page===name));
+
+  if(name==='today') renderToday();
+  if(name==='stack') renderStack();
+  if(name==='calendar') renderCal();
+  if(name==='metrics') renderMetrics();
+}
+
+// Wire up navigation
+document.querySelectorAll('.nav-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>showPage(btn.dataset.page));
+});
+
+// Close overlays
+document.getElementById('supp-cancel-btn').addEventListener('click',()=>document.getElementById('overlay-supplement').classList.remove('active'));
+document.getElementById('supp-save-btn').addEventListener('click',saveSupplement);
+document.getElementById('supp-image-input').addEventListener('change',handleSuppImage);
+document.getElementById('add-nutrient-btn')?.addEventListener('click',()=>{currentNutrients.push({name:'',amount:'',unit:'mg'});renderNutrientList();});
+document.getElementById('show-nutrients-btn')?.addEventListener('click',()=>{
+  if(currentNutrients.length===0) currentNutrients=[{name:'',amount:'',unit:'mg'}];
+  renderNutrientList();
+  document.getElementById('nutrients-section').style.display='block';
+});
+
+document.getElementById('pep-cancel-btn').addEventListener('click',()=>document.getElementById('overlay-peptide').classList.remove('active'));
+document.getElementById('pep-save-btn').addEventListener('click',savePeptide);
+['pep-mg','pep-bac','pep-dose'].forEach(id=>document.getElementById(id).addEventListener('input',runPepCalc));
+document.getElementById('pep-frequency-type').addEventListener('change',e=>{
+  document.getElementById('freq-weekly-inputs').style.display=e.target.value==='weekly'?'block':'none';
+  document.getElementById('freq-cadence-inputs').style.display=e.target.value==='cadence'?'block':'none';
+});
+
+document.getElementById('metric-cancel-btn').addEventListener('click',()=>document.getElementById('overlay-metric').classList.remove('active'));
+document.getElementById('metric-save-btn').addEventListener('click',saveMetric);
+document.getElementById('scale-image-input').addEventListener('change',handleScaleImage);
+document.getElementById('day-detail-close').addEventListener('click',()=>document.getElementById('overlay-day-detail').classList.remove('active'));
+
+// Settings actions
+document.getElementById('export-logs-btn').addEventListener('click',exportLogs);
+document.getElementById('export-metrics-btn').addEventListener('click',exportMetrics);
+document.getElementById('export-stack-btn').addEventListener('click',exportStack);
+document.getElementById('clear-data-btn').addEventListener('click',()=>{
+  if(confirm('Delete ALL data? This cannot be undone.') && confirm('Are you absolutely sure? All supplements, peptides, logs, and metrics will be deleted.')) {
+    ['st_supps','st_peps','st_logs','st_metrics'].forEach(k=>localStorage.removeItem(k));
+    renderToday(); renderStack(); toast('All data cleared','warning');
+  }
+});
+
+// Close modals on backdrop click
+document.getElementById('modal-extra-doses').addEventListener('click',e=>{if(e.target===e.currentTarget)e.currentTarget.style.display='none';});
+document.getElementById('modal-edit-cycle').addEventListener('click',e=>{if(e.target===e.currentTarget)e.currentTarget.style.display='none';});
+
+// Initial render
+renderToday();
+
+// Register service worker (only works over http/https, not file://)
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
+</script>
+</body>
+</html>
