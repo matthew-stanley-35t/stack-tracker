@@ -92,8 +92,8 @@ img{max-width:100%;display:block}
 .input::placeholder{color:var(--text3)}
 .select{width:100%;background:var(--bg4);border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:15px;color:var(--text);-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238FA8C8' fill='none' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center}
 .select option{background:var(--bg2)}
-.input-row{display:flex;gap:10px}
-.input-row .form-group{flex:1}
+.input-row{display:flex;gap:10px;overflow:hidden}
+.input-row .form-group{flex:1;min-width:0}
 /* ===== OVERLAYS ===== */
 .overlay{position:fixed;inset:0;background:var(--bg);z-index:200;display:flex;flex-direction:column;transform:translateY(100%);transition:transform .3s ease;overflow:hidden}
 .overlay.active{transform:translateY(0)}
@@ -404,7 +404,7 @@ details > summary::-webkit-details-marker{display:none}
           <div class="ocr-icon">📸</div>
           <div class="ocr-hint">Tap to photograph or upload your nutrition label</div>
           <div class="ocr-hint-small">OCR will auto-detect nutrients</div>
-          <input type="file" id="supp-image-input" accept="image/*" style="display:none">
+          <input type="file" id="supp-image-input" accept="image/*" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;overflow:hidden">
         </label>
         <img class="img-preview" id="supp-preview" alt="Label preview">
         <div id="ocr-progress" style="display:none;padding:10px 0">
@@ -547,7 +547,7 @@ details > summary::-webkit-details-marker{display:none}
         <div class="ocr-icon">⚖️</div>
         <div class="ocr-hint">Tap to scan smart scale screenshot</div>
         <div class="ocr-hint-small">Auto-detects weight, body fat, lean mass & more</div>
-        <input type="file" id="scale-image-input" accept="image/*" style="display:none">
+        <input type="file" id="scale-image-input" accept="image/*" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0;overflow:hidden">
       </label>
       <img class="img-preview" id="metric-preview" alt="Scale preview">
       <div id="metric-ocr-progress" style="display:none;padding:10px 0">
@@ -756,7 +756,7 @@ const OCR = (() => {
 
     const clean = raw => raw
       .replace(/\s+\d+\s*%[*†]*/g, ' ')   // strip trailing %DV columns
-      .replace(/[†*°•·+]+\s*$/g, '')        // strip trailing daggers / asterisks / "+" (OCR artifact for †)
+      .replace(/[†*°•·+|]+\s*$/g, '')        // strip trailing daggers / asterisks / pipes (OCR artifacts)
       .trim();
 
     const lines = text.split('\n').map(clean).filter(l => l.length > 1);
@@ -1252,8 +1252,12 @@ function showSuppForm(editId=null) {
   document.querySelectorAll('.day-cb').forEach(cb=>cb.checked=true);
   document.getElementById('nutrient-list').innerHTML='';
   document.getElementById('nutrients-section').style.display='none';
-  document.getElementById('supp-preview').style.display='none';
+  const suppPreview = document.getElementById('supp-preview');
+  suppPreview.style.display='none';
+  suppPreview.removeAttribute('src');
+  document.getElementById('supp-image-input').value='';
   document.getElementById('ocr-progress').style.display='none';
+  document.getElementById('ocr-status').textContent='Scanning...';
 
   if (editId) {
     const s = Store.getSupps().find(x=>x.id===editId);
