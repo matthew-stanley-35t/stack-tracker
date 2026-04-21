@@ -41,7 +41,7 @@ img{max-width:100%;display:block}
 /* ===== LAYOUT ===== */
 #app{display:flex;flex-direction:column;height:100dvh;height:100vh}
 .main-content{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;position:relative}
-.page{display:none;padding:16px 16px calc(16px + var(--safe-bottom));min-height:100%}
+.page{display:none;padding:calc(env(safe-area-inset-top,0px) + 16px) 16px calc(16px + var(--safe-bottom));min-height:100%}
 .page.active{display:block}
 /* ===== BOTTOM NAV ===== */
 .bottom-nav{
@@ -253,6 +253,16 @@ canvas#metrics-chart{width:100%;border-radius:12px;display:block}
 .ended-section{margin-top:12px}
 .ended-section summary{font-size:13px;color:var(--text3);cursor:pointer;padding:4px 0;list-style:none}
 details > summary::-webkit-details-marker{display:none}
+/* Collapsible stack sections */
+.stack-section{margin-bottom:24px}
+.stack-section-summary{display:flex;align-items:center;justify-content:space-between;cursor:pointer;list-style:none;padding:4px 0;margin-bottom:12px}
+.stack-section-summary::-webkit-details-marker{display:none}
+.stack-section-summary .section-title{font-size:15px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px}
+.stack-section-summary .section-right{display:flex;align-items:center;gap:8px}
+.stack-section-summary .collapse-arrow{font-size:12px;color:var(--text3);transition:transform .2s}
+details.stack-section[open] .collapse-arrow{transform:rotate(180deg)}
+/* Low-stock yellow border */
+.card.low-stock{border-color:var(--gold)}
 .freq-section{margin-top:10px}
 .section-divider{height:1px;background:var(--border);margin:20px 0}
 .toast{position:fixed;bottom:calc(var(--nav-h) + 12px + var(--safe-bottom));left:50%;transform:translateX(-50%);background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:10px 20px;border-radius:10px;font-size:14px;font-weight:500;z-index:1000;opacity:0;transition:opacity .3s;pointer-events:none;max-width:90%;text-align:center}
@@ -376,7 +386,7 @@ details > summary::-webkit-details-marker{display:none}
         </div>
         <div class="form-group">
           <label class="form-label">Servings/day</label>
-          <input class="input" id="supp-servings" type="number" value="1" min="1">
+          <input class="input" id="supp-servings" type="number" value="1" min="0.5" step="0.5">
         </div>
       </div>
       <div class="form-group">
@@ -394,6 +404,16 @@ details > summary::-webkit-details-marker{display:none}
       <div class="form-group">
         <label class="form-label">Notes</label>
         <input class="input" id="supp-notes" type="text" placeholder="Optional notes">
+      </div>
+      <div class="input-row">
+        <div class="form-group">
+          <label class="form-label">Servings per Container</label>
+          <input class="input" id="supp-spc" type="number" min="1" step="1" placeholder="e.g. 30">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Package Start Date</label>
+          <input class="input" id="supp-pkg-start" type="date">
+        </div>
       </div>
 
       <!-- OCR Section -->
@@ -907,10 +927,20 @@ function calcUnits(mgPowder, bacMl, doseMcg) {
   return { units: Math.round(vol*100*10)/10, conc, vol };
 }
 function calcTotalDoses(mg, dose) { if(!mg||!dose) return null; return Math.floor((mg*1000)/dose); }
+
+// Count explicit taken logs since a given date (used for post-dose-change tracking)
+function getExplicitDosesSince(pepId, sinceDate) {
+  const logs = Store.getLogs();
+  return Object.entries(logs).filter(([date, l]) => {
+    if (sinceDate && date < sinceDate) return false;
+    return l.peptides?.[pepId]?.taken === true;
+  }).length;
+}
+// Retroactive dose count: past scheduled days default to taken unless explicitly marked otherwise
 function getDosesUsed(pepId) {
   const pep = Store.getPeps().find(p=>p.id===pepId);
   if (!pep) return 0;
-  const start = dateObj(pep.cycleStartDate || (pep.createdAt||'').split('T')[0]);
+  const start = dateObj(pep.cycleStartDate||(pep.createdAt||'').split('T')[0]);
   const yesterday = new Date(); yesterday.setDate(yesterday.getDate()-1);
   let count = 0;
   const cur = new Date(start);
@@ -924,6 +954,16 @@ function getDosesUsed(pepId) {
   }
   return count;
 }
+// Total mcg consumed: uses retroactive counting normally, but after a dose change
+// uses a frozen snapshot + explicit-only logs since that change date
+function getTotalMcgUsed(pep) {
+  if (pep.snapshotDate) {
+    const snapshot = pep.mcgUsedSnapshot || 0;
+    const sinceSnap = getExplicitDosesSince(pep.id, pep.snapshotDate);
+    return snapshot + sinceSnap * (pep.doseMcg || 0);
+  }
+  return getDosesUsed(pep.id) * (pep.doseMcg || 0);
+}
 function getCycleWeeks(pep) {
   if (pep.cycleWeeksOverride!=null) return pep.cycleWeeksOverride;
   const start = dateObj(pep.cycleStartDate||(pep.createdAt||'').split('T')[0]);
@@ -931,9 +971,42 @@ function getCycleWeeks(pep) {
 }
 function getRemainingDoses(pep) {
   if (pep.remainingDosesOverride!=null) return pep.remainingDosesOverride;
-  const total = calcTotalDoses(pep.mgPowder, pep.doseMcg);
-  if (total===null) return null;
-  return Math.max(0, total - getDosesUsed(pep.id));
+  const totalMcg = (pep.mgPowder||0) * 1000;
+  if (!totalMcg || !pep.doseMcg) return null;
+  return Math.max(0, Math.floor((totalMcg - getTotalMcgUsed(pep)) / pep.doseMcg));
+}
+// How many calendar days until doses run out (for yellow highlight)
+function getPepDaysRemaining(pep) {
+  const rem = getRemainingDoses(pep);
+  if (rem === null) return null;
+  if (rem === 0) return 0;
+  let count = 0, days = 0;
+  const cur = dateObj(todayStr());
+  while (count < rem && days < 365) {
+    if (isPepScheduledOn(pep, cur)) count++;
+    cur.setDate(cur.getDate()+1); days++;
+  }
+  return days;
+}
+// Supplement package tracking helpers
+function getSuppServingsUsed(supp) {
+  if (!supp.packageStartDate) return 0;
+  const logs = Store.getLogs();
+  let count = 0;
+  for (const [date, log] of Object.entries(logs)) {
+    if (date < supp.packageStartDate) continue;
+    const sl = log.supplements?.[supp.id];
+    if (sl?.taken) count += (supp.servingsPerDay||1) + (sl.extraDoses||0);
+  }
+  return count;
+}
+function getSuppDaysRemaining(supp) {
+  if (!supp.servingsPerContainer || !supp.packageStartDate) return null;
+  const rem = Math.max(0, supp.servingsPerContainer - getSuppServingsUsed(supp));
+  if (rem === 0) return 0;
+  const daysPerWeek = (supp.daysOfWeek||[0,1,2,3,4,5,6]).length;
+  if (daysPerWeek === 0) return null;
+  return Math.ceil(rem / (supp.servingsPerDay||1) / daysPerWeek * 7);
 }
 
 const COLORS = ['#0080C6','#FFB612','#4FC3F7','#FFA000','#29B6F6','#FF8F00','#81D4FA','#FFCA28','#4DD0E1','#FF7043','#AB47BC','#66BB6A'];
@@ -1122,22 +1195,27 @@ function renderStack() {
       <button class="btn-secondary" id="add-supp-btn">+ Supplement</button>
     </div>
 
-    <div class="section">
-      <div class="section-header">
+    <details class="stack-section" open>
+      <summary class="stack-section-summary">
         <span class="section-title">Peptides</span>
-        <span class="count-badge">${active.length} active</span>
-      </div>
+        <span class="section-right"><span class="count-badge">${active.length} active</span><span class="collapse-arrow">▼</span></span>
+      </summary>
       ${active.length===0 ? '<p class="muted small">No active peptides.</p>' : active.map(p=>pepCard(p)).join('')}
       ${ended.length>0?`<details class="ended-section"><summary>Ended vials (${ended.length})</summary>${ended.map(p=>pepCard(p,true)).join('')}</details>`:''}
-    </div>
+    </details>
 
-    <div class="section">
-      <div class="section-header">
+    <details class="stack-section" open>
+      <summary class="stack-section-summary">
         <span class="section-title">Supplements</span>
-        <span class="count-badge">${supps.length}</span>
-      </div>
-      ${supps.length===0 ? '<p class="muted small">No supplements added yet.</p>' : supps.map(s=>`
-        <div class="card supp-card">
+        <span class="section-right"><span class="count-badge">${supps.length}</span><span class="collapse-arrow">▼</span></span>
+      </summary>
+      ${supps.length===0 ? '<p class="muted small">No supplements added yet.</p>' : supps.map(s=>{
+        const daysRem = getSuppDaysRemaining(s);
+        const lowStock = daysRem !== null && daysRem <= 7;
+        const servUsed = s.packageStartDate ? getSuppServingsUsed(s) : null;
+        const servRem = (s.servingsPerContainer && servUsed !== null) ? Math.max(0, s.servingsPerContainer - servUsed) : null;
+        return `
+        <div class="card supp-card ${lowStock?'low-stock':''}">
           <div class="card-header">
             <div><div class="card-name">${esc(s.name)}</div>${s.brand?`<div class="card-sub">${esc(s.brand)}</div>`:''}</div>
             <div class="card-actions">
@@ -1147,11 +1225,15 @@ function renderStack() {
           </div>
           <div class="card-body">
             <div class="day-pills">${dayPills(s.daysOfWeek)}</div>
+            ${servRem !== null ? `<div class="card-stats" style="margin-bottom:8px">
+              <div class="stat ${lowStock?'stat-warning':''}"><span class="stat-label">Servings Left</span><span class="stat-value">${servRem} / ${s.servingsPerContainer}</span></div>
+              ${daysRem !== null ? `<div class="stat ${lowStock?'stat-warning':''}"><span class="stat-label">Days Remaining</span><span class="stat-value">${daysRem} days</span></div>` : ''}
+            </div>` : ''}
             ${(s.nutrients||[]).length>0?`<div class="supp-nutrients">${s.nutrients.slice(0,5).map(n=>`<span class="nutrient-chip">${esc(n.name)}: ${n.amount} ${esc(n.unit)}</span>`).join('')}${s.nutrients.length>5?`<span class="nutrient-chip muted">+${s.nutrients.length-5} more</span>`:''}</div>`:''}
           </div>
-        </div>
-      `).join('')}
-    </div>
+        </div>`;
+      }).join('')}
+    </details>
   `;
 
   // Stack-wide nutrient totals
@@ -1165,9 +1247,13 @@ function renderStack() {
   }
   const tvals = Object.values(totals);
   if (tvals.length>0) {
-    html += `<div class="section"><div class="section-header"><span class="section-title">Total Daily Nutrients</span><span class="muted small">full stack</span></div>
+    html += `<details class="stack-section" open>
+      <summary class="stack-section-summary">
+        <span class="section-title">Total Daily Nutrients</span>
+        <span class="section-right"><span class="muted small">full stack</span><span class="collapse-arrow">▼</span></span>
+      </summary>
       <div class="nutrient-totals">${sortNutrients(tvals).map(n=>nutrientRow(n)).join('')}</div>
-    </div>`;
+    </details>`;
   }
 
   document.getElementById('page-stack').innerHTML = html;
@@ -1194,7 +1280,9 @@ function pepCard(pep, isEnded=false) {
   const weeks = getCycleWeeks(pep);
   const used = getDosesUsed(pep.id);
   const pct = total ? Math.min(100,((total-(rem||0))/total)*100) : 0;
-  return `<div class="card pep-card ${isEnded?'ended':''}">
+  const daysLeft = !isEnded ? getPepDaysRemaining(pep) : null;
+  const lowStock = daysLeft !== null && daysLeft <= 7;
+  return `<div class="card pep-card ${isEnded?'ended':''} ${lowStock?'low-stock':''}">
     <div class="card-header">
       <div class="pep-card-title">
         <span class="pep-dot large" style="background:${pep.color||'#0080C6'}"></span>
@@ -1273,6 +1361,8 @@ function showSuppForm(editId=null) {
   document.getElementById('ocr-progress').style.display='none';
   document.getElementById('ocr-status').textContent='Scanning...';
 
+  document.getElementById('supp-spc').value='';
+  document.getElementById('supp-pkg-start').value='';
   if (editId) {
     const s = Store.getSupps().find(x=>x.id===editId);
     if (s) {
@@ -1280,6 +1370,8 @@ function showSuppForm(editId=null) {
       document.getElementById('supp-brand').value=s.brand||'';
       document.getElementById('supp-servings').value=s.servingsPerDay||1;
       document.getElementById('supp-notes').value=s.notes||'';
+      document.getElementById('supp-spc').value=s.servingsPerContainer||'';
+      document.getElementById('supp-pkg-start').value=s.packageStartDate||'';
       (s.daysOfWeek||[0,1,2,3,4,5,6]).forEach(d=>{ const cb=document.querySelector(`.day-cb[value="${d}"]`); if(cb) cb.checked=true; });
       document.querySelectorAll('.day-cb').forEach(cb=>{ cb.checked=(s.daysOfWeek||[0,1,2,3,4,5,6]).includes(parseInt(cb.value)); });
       currentNutrients = (s.nutrients||[]).map(n=>({...n}));
@@ -1346,12 +1438,16 @@ function saveSupplement() {
   const bad = currentNutrients.filter(n=>n.name&&n.name.trim()&&(n.amount===''||n.amount==null||isNaN(n.amount)));
   if (bad.length>0) { toast(`Enter amounts for: ${bad.map(n=>n.name).join(', ')},'error'`,'error'); return; }
   const nutrients = currentNutrients.filter(n=>n.name&&n.name.trim()).map(n=>({name:n.name.trim(),amount:parseFloat(n.amount)||0,unit:(n.unit||'').trim()}));
+  const spcVal = document.getElementById('supp-spc').value;
+  const pkgStart = document.getElementById('supp-pkg-start').value;
   const data = {
     name,
     brand:document.getElementById('supp-brand').value.trim(),
-    servingsPerDay:parseInt(document.getElementById('supp-servings').value)||1,
+    servingsPerDay:parseFloat(document.getElementById('supp-servings').value)||1,
     notes:document.getElementById('supp-notes').value.trim(),
-    daysOfWeek:days, nutrients
+    daysOfWeek:days, nutrients,
+    servingsPerContainer: spcVal ? parseInt(spcVal) : null,
+    packageStartDate: pkgStart || null
   };
   if (editingSuppId) { Store.updateSupp(editingSuppId,data); toast('Supplement updated','success'); }
   else { Store.addSupp(data); toast('Supplement added','success'); }
@@ -1460,7 +1556,14 @@ function savePeptide() {
   };
   if(editingPepId){
     const ex=Store.getPeps().find(p=>p.id===editingPepId);
-    Store.updatePep(editingPepId,{...data,vialEndedEarly:ex?.vialEndedEarly||false});
+    let mcgUsedSnapshot = ex?.mcgUsedSnapshot||0;
+    let snapshotDate = ex?.snapshotDate||null;
+    if(ex && ex.doseMcg && data.doseMcg !== ex.doseMcg) {
+      // Dose is changing — freeze current mcg usage into snapshot
+      mcgUsedSnapshot = getTotalMcgUsed(ex);
+      snapshotDate = todayStr();
+    }
+    Store.updatePep(editingPepId,{...data,vialEndedEarly:ex?.vialEndedEarly||false,mcgUsedSnapshot,snapshotDate});
     toast('Peptide updated','success');
   } else {
     Store.addPep(data); toast('Peptide added','success');
@@ -1521,6 +1624,50 @@ function drawCalGrid() {
   const peps = calFilter==='all' ? allPeps.filter(p=>!p.vialEndedEarly) : allPeps.filter(p=>p.id===calFilter);
   const today = todayStr();
 
+  // getRemainingDoses counts from today (getDosesUsed only goes through yesterday).
+  // Initialize pepDosesLeft from today's remaining budget.
+  const pepDosesLeft = {};
+  for (const pep of peps) {
+    const rem = getRemainingDoses(pep);
+    pepDosesLeft[pep.id] = rem !== null ? rem : null; // null = no dose info → always show
+  }
+
+  // Determine first day of the viewed period
+  let viewFirstStr;
+  if (calMode === 'month') {
+    const y=calDate.getFullYear(), m=calDate.getMonth();
+    viewFirstStr = `${y}-${String(m+1).padStart(2,'0')}-01`;
+  } else {
+    const s=new Date(calDate); s.setDate(s.getDate()-s.getDay());
+    viewFirstStr = s.toISOString().split('T')[0];
+  }
+
+  // If the view starts after today, burn through scheduled doses from today up to
+  // (but not including) the view start — so pepDosesLeft is correct for the view period.
+  if (viewFirstStr > today) {
+    const cur = dateObj(today);
+    while (true) {
+      const ds = cur.toISOString().split('T')[0];
+      if (ds >= viewFirstStr) break;
+      for (const pep of peps) {
+        if (pepDosesLeft[pep.id] === null) continue;
+        if (isPepScheduledOn(pep, cur) && pepDosesLeft[pep.id] > 0) {
+          pepDosesLeft[pep.id]--;
+        }
+      }
+      cur.setDate(cur.getDate()+1);
+    }
+  }
+
+  // Check whether to show a future dot; always decrements when scheduled & future.
+  function consumeFutureDose(pep, ds) {
+    if (ds < today) return true; // past: always show
+    if (pepDosesLeft[pep.id] === null) return true; // no dose info
+    if (pepDosesLeft[pep.id] <= 0) return false;
+    pepDosesLeft[pep.id]--;
+    return true;
+  }
+
   if (calMode==='month') {
     const y=calDate.getFullYear(), m=calDate.getMonth();
     document.getElementById('cal-period').textContent=`${MON[m]} ${y}`;
@@ -1532,12 +1679,12 @@ function drawCalGrid() {
     for(let d=1;d<=days;d++){
       const ds=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
       const do2=dateObj(ds);
-      const log=Store.getLog(ds);
-      const sched=peps.filter(p=>isPepScheduledOn(p,do2));
-      const taken=sched.filter(p=>isPepEffectivelyTaken(p,ds));
+      const allSched=peps.filter(p=>isPepScheduledOn(p,do2));
+      const visibleSched=allSched.filter(p=>consumeFutureDose(p,ds));
+      const taken=visibleSched.filter(p=>isPepEffectivelyTaken(p,ds));
       html+=`<div class="cal-cell ${ds===today?'today':''}" data-date="${ds}">
         <span class="cal-day-num">${d}</span>
-        <div class="cal-dots">${sched.map(p=>`<span class="cal-dot ${taken.find(t=>t.id===p.id)?'taken':'pending'}" style="background:${p.color}" title="${esc(p.name)}"></span>`).join('')}</div>
+        <div class="cal-dots">${visibleSched.map(p=>`<span class="cal-dot ${taken.find(t=>t.id===p.id)?'taken':'pending'}" style="background:${p.color}" title="${esc(p.name)}"></span>`).join('')}</div>
       </div>`;
     }
     html+='</div>';
@@ -1553,12 +1700,12 @@ function drawCalGrid() {
     let html='<div class="cal-grid week-grid">';
     for(const d of wdays){
       const ds=d.toISOString().split('T')[0];
-      const log=Store.getLog(ds);
-      const sched=peps.filter(p=>isPepScheduledOn(p,d));
-      const taken=sched.filter(p=>isPepEffectivelyTaken(p,ds));
+      const allSched=peps.filter(p=>isPepScheduledOn(p,d));
+      const visibleSched=allSched.filter(p=>consumeFutureDose(p,ds));
+      const taken=visibleSched.filter(p=>isPepEffectivelyTaken(p,ds));
       html+=`<div class="cal-cell week-cell ${ds===today?'today':''}" data-date="${ds}">
         <div class="week-cell-header"><span class="week-day-name">${dayNames[d.getDay()]}</span><span class="week-day-num">${d.getDate()}</span></div>
-        <div class="week-peptides">${sched.length===0?'<span class="muted" style="font-size:11px">Rest</span>':sched.map(p=>`<div class="week-pep-row ${taken.find(t=>t.id===p.id)?'taken':''}"><span class="cal-dot" style="background:${p.color}"></span><span class="week-pep-name">${esc(p.name)}</span></div>`).join('')}</div>
+        <div class="week-peptides">${visibleSched.length===0?'<span class="muted" style="font-size:11px">Rest</span>':visibleSched.map(p=>`<div class="week-pep-row ${taken.find(t=>t.id===p.id)?'taken':''}"><span class="cal-dot" style="background:${p.color}"></span><span class="week-pep-name">${esc(p.name)}</span></div>`).join('')}</div>
       </div>`;
     }
     html+='</div>';
