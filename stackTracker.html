@@ -5,9 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Stack Tracker">
+<meta name="apple-mobile-web-app-title" content="PepBros Gainz">
 <meta name="theme-color" content="#0A0E1A">
-<title>Stack Tracker</title>
+<title>PepBros Gainz</title>
 <style>
 /* ===== VARIABLES ===== */
 :root {
@@ -270,6 +270,24 @@ details.stack-section[open] .collapse-arrow{transform:rotate(180deg)}
 .toast.success{border-color:var(--success);color:var(--success)}
 .toast.error{border-color:var(--danger);color:var(--danger)}
 .toast.warning{border-color:var(--warning);color:var(--warning)}
+/* ===== MACROS PAGE ===== */
+.macro-wheels{display:flex;gap:4px;justify-content:space-around;margin-bottom:24px}
+.macro-wheel-card{display:flex;flex-direction:column;align-items:center;flex:1;min-width:0}
+.macro-wheel-label{font-size:13px;font-weight:700;margin-top:4px;color:var(--text)}
+.macro-goal-badge{font-size:11px;margin-top:2px}
+.macro-supp-note{font-size:10px;color:var(--blue-light);margin-top:2px;text-align:center}
+.meal-card{display:flex;align-items:center;justify-content:space-between;background:var(--card-bg);border:1px solid var(--border);border-radius:12px;padding:13px 14px;margin-bottom:8px}
+.meal-info{flex:1;min-width:0}
+.meal-name{font-size:15px;font-weight:500}
+.meal-macros-row{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.meal-macro-chip{font-size:11px;padding:2px 8px;border-radius:6px;font-weight:600}
+.meal-macro-chip.protein{background:rgba(76,175,80,.15);color:#4CAF50}
+.meal-macro-chip.carbs{background:rgba(79,195,247,.15);color:#4FC3F7}
+.meal-macro-chip.fat{background:rgba(255,182,18,.15);color:#FFB612}
+.macro-goal-row{display:flex;align-items:center;gap:8px;margin-bottom:16px}
+.macro-goal-row .form-label{margin-bottom:0;min-width:60px}
+.macro-goal-type-sel{flex:1;background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;color:var(--text);-webkit-appearance:none;appearance:none}
+.macro-goal-val-inp{flex:1;background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;color:var(--text)}
 </style>
 </head>
 <body>
@@ -289,6 +307,9 @@ details.stack-section[open] .collapse-arrow{transform:rotate(180deg)}
 
     <!-- METRICS PAGE -->
     <div id="page-metrics" class="page"></div>
+
+    <!-- MACROS PAGE -->
+    <div id="page-macros" class="page"></div>
 
     <!-- SETTINGS PAGE -->
     <div id="page-settings" class="page">
@@ -349,7 +370,7 @@ details.stack-section[open] .collapse-arrow{transform:rotate(180deg)}
       </div>
       <div class="settings-section">
         <p class="muted small" style="text-align:center;line-height:1.7">
-          Stack Tracker v1.0<br>
+          PepBros Gainz v1.0<br>
           Data stored locally on this device<br>
           LA Chargers ⚡
         </p>
@@ -375,6 +396,10 @@ details.stack-section[open] .collapse-arrow{transform:rotate(180deg)}
     <button class="nav-btn" data-page="metrics">
       <span class="nav-icon">📊</span>
       Metrics
+    </button>
+    <button class="nav-btn" data-page="macros">
+      <span class="nav-icon">🥩</span>
+      Macros
     </button>
     <button class="nav-btn" data-page="settings">
       <span class="nav-icon">⚙️</span>
@@ -593,6 +618,10 @@ details.stack-section[open] .collapse-arrow{transform:rotate(180deg)}
         <div class="ocr-status" id="metric-ocr-progress-status">Scanning...</div>
       </div>
       <div id="metric-ocr-status" class="ocr-status" style="display:none;margin-bottom:12px"></div>
+      <details id="metric-ocr-debug" style="display:none;margin-bottom:12px">
+        <summary style="font-size:12px;color:var(--text3);cursor:pointer">Show raw OCR text (for debugging)</summary>
+        <pre id="metric-ocr-raw" style="font-size:10px;color:var(--text2);background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:10px;margin-top:8px;white-space:pre-wrap;word-break:break-word;max-height:200px;overflow-y:auto"></pre>
+      </details>
 
       <div class="input-row">
         <div class="form-group" style="flex:2">
@@ -682,6 +711,71 @@ details.stack-section[open] .collapse-arrow{transform:rotate(180deg)}
   </div>
 </div>
 
+<!-- ===== MODAL: MACRO GOALS ===== -->
+<div class="modal-backdrop" id="modal-macro-goals">
+  <div class="modal">
+    <div class="modal-title">Set Macro Goals</div>
+    <p class="muted small" style="margin-bottom:16px">Set a minimum or maximum target for each macro. Leave the value blank to remove a goal.</p>
+    <div class="macro-goal-row">
+      <label class="form-label" style="min-width:72px">Protein</label>
+      <select class="macro-goal-type-sel" id="macro-protein-type">
+        <option value="min">Min ≥</option>
+        <option value="max">Max ≤</option>
+      </select>
+      <input class="macro-goal-val-inp" id="macro-protein-val" type="number" min="0" placeholder="g/day">
+    </div>
+    <div class="macro-goal-row">
+      <label class="form-label" style="min-width:72px">Carbs</label>
+      <select class="macro-goal-type-sel" id="macro-carbs-type">
+        <option value="min">Min ≥</option>
+        <option value="max">Max ≤</option>
+      </select>
+      <input class="macro-goal-val-inp" id="macro-carbs-val" type="number" min="0" placeholder="g/day">
+    </div>
+    <div class="macro-goal-row">
+      <label class="form-label" style="min-width:72px">Fat</label>
+      <select class="macro-goal-type-sel" id="macro-fat-type">
+        <option value="min">Min ≥</option>
+        <option value="max">Max ≤</option>
+      </select>
+      <input class="macro-goal-val-inp" id="macro-fat-val" type="number" min="0" placeholder="g/day">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary btn-full" id="macro-goals-cancel">Cancel</button>
+      <button class="btn-primary btn-full" id="macro-goals-save">Save Goals</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== OVERLAY: ADD MEAL ===== -->
+<div class="overlay" id="overlay-meal">
+  <div class="overlay-header">
+    <button class="btn-link" id="meal-cancel-btn">Cancel</button>
+    <span class="overlay-title">Add Meal</span>
+    <button class="btn-link" style="color:var(--gold)" id="meal-save-btn">Save</button>
+  </div>
+  <div class="overlay-body">
+    <div class="form-group">
+      <label class="form-label">Meal Name</label>
+      <input class="input" id="meal-name" type="text" placeholder="e.g. Chicken &amp; Rice" autocomplete="off">
+    </div>
+    <div class="input-row">
+      <div class="form-group">
+        <label class="form-label" style="color:#4CAF50">Protein (g)</label>
+        <input class="input" id="meal-protein" type="number" min="0" step="0.1" placeholder="0">
+      </div>
+      <div class="form-group">
+        <label class="form-label" style="color:#4FC3F7">Carbs (g)</label>
+        <input class="input" id="meal-carbs" type="number" min="0" step="0.1" placeholder="0">
+      </div>
+    </div>
+    <div class="form-group" style="max-width:50%">
+      <label class="form-label" style="color:#FFB612">Fat (g)</label>
+      <input class="input" id="meal-fat" type="number" min="0" step="0.1" placeholder="0">
+    </div>
+  </div>
+</div>
+
 <!-- ===== TOAST ===== -->
 <div class="toast" id="toast"></div>
 
@@ -692,7 +786,7 @@ details.stack-section[open] .collapse-arrow{transform:rotate(180deg)}
 // STORAGE
 // ============================================================
 const Store = (() => {
-  const K = { SUPPS:'st_supps', PEPS:'st_peps', LOGS:'st_logs', METRICS:'st_metrics' };
+  const K = { SUPPS:'st_supps', PEPS:'st_peps', LOGS:'st_logs', METRICS:'st_metrics', MACRO_GOALS:'st_macro_goals', MEALS:'st_meals' };
   const get = k => { try { return JSON.parse(localStorage.getItem(k)) || []; } catch { return []; }};
   const getObj = k => { try { return JSON.parse(localStorage.getItem(k)) || {}; } catch { return {}; }};
   const set = (k,v) => localStorage.setItem(k, JSON.stringify(v));
@@ -726,7 +820,17 @@ const Store = (() => {
   const deleteMetric = id => set(K.METRICS, getMetrics().filter(m => m.id!==id));
   const updateMetric = (id,u) => set(K.METRICS, getMetrics().map(m => m.id===id ? {...m,...u} : m));
 
-  return { uid, getSupps, saveSupps, addSupp, updateSupp, deleteSupp, getPeps, savePeps, addPep, updatePep, deletePep, getLogs, getLog, saveLog, toggleSupp, setExtra, togglePep, getMetrics, addMetric, deleteMetric, updateMetric };
+  // Macro Goals  { protein:{type:'min'|'max',value:N}, carbs:{...}, fat:{...} }
+  const getMacroGoals = () => { try { return JSON.parse(localStorage.getItem(K.MACRO_GOALS)) || {}; } catch { return {}; }};
+  const saveMacroGoals = g => localStorage.setItem(K.MACRO_GOALS, JSON.stringify(g));
+
+  // Meals keyed by date string, each is array of {id,name,protein,carbs,fat}
+  const _getMeals = () => { try { return JSON.parse(localStorage.getItem(K.MEALS)) || {}; } catch { return {}; }};
+  const getMealsForDate = dateStr => (_getMeals()[dateStr] || []);
+  const addMeal = (dateStr, meal) => { const m=_getMeals(); if(!m[dateStr]) m[dateStr]=[]; meal.id=uid(); m[dateStr].push(meal); localStorage.setItem(K.MEALS,JSON.stringify(m)); };
+  const deleteMeal = (dateStr, mealId) => { const m=_getMeals(); if(m[dateStr]) m[dateStr]=m[dateStr].filter(x=>x.id!==mealId); localStorage.setItem(K.MEALS,JSON.stringify(m)); };
+
+  return { uid, getSupps, saveSupps, addSupp, updateSupp, deleteSupp, getPeps, savePeps, addPep, updatePep, deletePep, getLogs, getLog, saveLog, toggleSupp, setExtra, togglePep, getMetrics, addMetric, deleteMetric, updateMetric, getMacroGoals, saveMacroGoals, getMealsForDate, addMeal, deleteMeal };
 })();
 
 // ============================================================
@@ -878,24 +982,35 @@ const OCR = (() => {
 
   function parseScaleData(text) {
     const t = text.toLowerCase().replace(/\r/g, '');
+    const lines = t.split('\n').map(l => l.trim()).filter(Boolean);
     const r = {};
 
-    // Find the first number (optionally with a lb/kg unit) within 3 lines after a label pattern.
-    // Using label-anchored matching prevents cross-tile value theft.
-    function after(labelPat, needUnit) {
-      const pat = labelPat
-        + '(?:[^\\n]*\\n){0,3}?[^\\n]*'
-        + '(\\d+(?:\\.\\d+)?)'
-        + (needUnit ? '\\s*(lbs?|kg)' : '');
-      return t.match(new RegExp(pat, 'i'));
+    // For a line matching labelRe, return the first number in [minV,maxV] found by scanning:
+    // 1) the same line after the label keyword, then 2) the next `win` lines.
+    // Stops early on a line that looks like another tile label (letters with no digits).
+    function metric(labelRe, minV, maxV, win) {
+      win = win == null ? 5 : win;
+      for (let i = 0; i < lines.length; i++) {
+        if (!labelRe.test(lines[i])) continue;
+        const search = [lines[i].replace(labelRe, '')].concat(lines.slice(i + 1, i + 1 + win));
+        for (let s = 0; s < search.length; s++) {
+          const sl = search[s];
+          if (s > 0 && /^[a-z]{3}/i.test(sl) && !/\d/.test(sl)) break; // another label line
+          for (const m of sl.matchAll(/(\d+(?:\.\d+)?)/g)) {
+            const v = parseFloat(m[1]);
+            if (v >= minV && v <= maxV) return v;
+          }
+        }
+      }
+      return null;
     }
 
-    // Weight: anchor to the "weight" label. Fallback: pick the largest lb/kg value in
-    // the text — body weight is always the single largest mass measurement on these scales.
-    const wLabel = after('\\bweight\\b', true);
-    if (wLabel) {
-      r.weight = parseFloat(wLabel[1]);
-      r.weightUnit = wLabel[2].startsWith('k') ? 'kg' : 'lbs';
+    // Weight: no unit required — scale tiles often render the unit as a superscript
+    // that OCR places on a separate line far from the number.
+    r.weight = metric(/\bweight\b/, 50, 700);
+    if (r.weight != null) {
+      const uMatch = t.match(/\b(lbs?|kg)\b/);
+      r.weightUnit = uMatch && uMatch[1].startsWith('k') ? 'kg' : 'lbs';
     } else {
       let max = 0;
       for (const m of [...t.matchAll(/(\d+(?:\.\d+)?)\s*(lbs?|kg)/g)]) {
@@ -904,21 +1019,19 @@ const OCR = (() => {
       }
     }
 
-    // Body fat %
-    const bfm = after('body\\s*fat|fat\\s*%');
-    if (bfm) r.bodyFat = parseFloat(bfm[1]);
+    const bf = metric(/body\s*fat|fat\s*%/, 1, 70);
+    if (bf != null) r.bodyFat = bf;
 
-    // Lean/muscle mass: prefer "muscle mass" label, fall back to "fat-free mass" / "lean mass"
-    const lmm = after('muscle\\s*mass', true) || after('fat.free\\s*mass|lean\\s*mass', true);
-    if (lmm) r.leanMass = parseFloat(lmm[1]);
+    const lm = metric(/muscle\s*mass/, 50, 400)
+      ?? metric(/fat.free\s*mass/, 50, 400)
+      ?? metric(/lean\s*mass/, 50, 400);
+    if (lm != null) r.leanMass = lm;
 
-    // Visceral fat
-    const vfm = after('visceral(?:\\s*fat)?');
-    if (vfm) r.visceralFat = parseFloat(vfm[1]);
+    const vf = metric(/visceral/, 1, 30);
+    if (vf != null) r.visceralFat = vf;
 
-    // BMI
-    const bmim = after('\\bbmi\\b');
-    if (bmim) r.bmi = parseFloat(bmim[1]);
+    const bmi = metric(/\bbmi\b/, 10, 70);
+    if (bmi != null) r.bmi = bmi;
 
     return r;
   }
@@ -1916,6 +2029,7 @@ function showMetricForm(editId=null) {
   document.getElementById('metric-preview').style.display='none';
   document.getElementById('metric-ocr-progress').style.display='none';
   document.getElementById('metric-ocr-status').style.display='none';
+  document.getElementById('metric-ocr-debug').style.display='none';
   document.getElementById('metric-date').value=todayStr();
   if(editId){
     const m=Store.getMetrics().find(x=>x.id===editId);
@@ -1943,6 +2057,9 @@ async function handleScaleImage(e) {
   try {
     const text=await OCR.recognize(file,'metric-progress-bar','metric-ocr-progress-status');
     document.getElementById('metric-ocr-progress').style.display='none';
+    // Show raw OCR for debugging
+    document.getElementById('metric-ocr-raw').textContent=text;
+    document.getElementById('metric-ocr-debug').style.display='block';
     const d=OCR.parseScaleData(text);
     if(d.weight!=null) document.getElementById('metric-weight').value=d.weight;
     if(d.weightUnit) document.getElementById('metric-unit').value=d.weightUnit;
@@ -2067,6 +2184,203 @@ function exportStack() {
 }
 
 // ============================================================
+// MACROS PAGE
+// ============================================================
+let macroDate = todayStr();
+
+function getSuppMacrosForDate(dateStr) {
+  const log = Store.getLog(dateStr);
+  const supps = Store.getSupps();
+  let protein = 0, carbs = 0, fat = 0;
+  for (const s of supps) {
+    if (!log.supplements[s.id]?.taken) continue;
+    const servings = (s.servingsPerDay || 1) + (log.supplements[s.id]?.extraDoses || 0);
+    for (const n of (s.nutrients || [])) {
+      const name = (n.name || '').toLowerCase();
+      const amt = (parseFloat(n.amount) || 0) * servings;
+      if (/protein/.test(name)) protein += amt;
+      else if (/carb/.test(name)) carbs += amt;
+      else if (/fat/.test(name)) fat += amt;
+    }
+  }
+  return { protein, carbs, fat };
+}
+
+function getMealMacrosForDate(dateStr) {
+  const meals = Store.getMealsForDate(dateStr);
+  return meals.reduce((acc, m) => ({
+    protein: acc.protein + (m.protein || 0),
+    carbs: acc.carbs + (m.carbs || 0),
+    fat: acc.fat + (m.fat || 0)
+  }), { protein: 0, carbs: 0, fat: 0 });
+}
+
+function macroWheel(label, current, suppAmt, goalValue, goalType) {
+  const r = 34, circ = +(2 * Math.PI * r).toFixed(1); // ≈213.6
+  const target = goalValue || 0;
+  const pct = target > 0 ? Math.min(current / target, 1) : 0;
+  const offset = +(circ * (1 - pct)).toFixed(1);
+  const over = target > 0 && current > target;
+  let fillColor = '#0080C6';
+  if (target > 0) {
+    if (goalType === 'max' && over) fillColor = '#EF5350';
+    else if (goalType === 'min' && over) fillColor = '#4CAF50';
+    else if (goalType === 'min' && !over) fillColor = '#0080C6';
+  }
+  const goalLabel = goalValue != null ? `${goalType === 'min' ? '≥' : '≤'}${goalValue}g` : 'no goal';
+  const goalColor = goalValue != null ? '#8FA8C8' : '#5A7A9A';
+
+  return `<div class="macro-wheel-card">
+    <svg viewBox="0 0 100 100" width="104" height="104">
+      <circle cx="50" cy="50" r="${r}" fill="none" stroke="#1A2340" stroke-width="12"/>
+      ${target > 0
+        ? `<circle cx="50" cy="50" r="${r}" fill="none" stroke="${fillColor}" stroke-width="12" stroke-dasharray="${circ}" stroke-dashoffset="${offset}" stroke-linecap="round" transform="rotate(-90 50 50)"/>`
+        : `<circle cx="50" cy="50" r="${r}" fill="none" stroke="#253860" stroke-width="12" stroke-dasharray="5 5"/>`}
+      <text x="50" y="47" text-anchor="middle" font-size="16" fill="#FFFFFF" font-weight="700" font-family="-apple-system,sans-serif">${Math.round(current)}g</text>
+      ${target > 0 ? `<text x="50" y="61" text-anchor="middle" font-size="9" fill="#8FA8C8" font-family="-apple-system,sans-serif">of ${target}g</text>` : ''}
+    </svg>
+    <div class="macro-wheel-label">${label}</div>
+    <div class="macro-goal-badge" style="color:${goalColor}">${goalLabel}</div>
+    ${suppAmt > 0 ? `<div class="macro-supp-note">+${Math.round(suppAmt)}g from supps</div>` : ''}
+  </div>`;
+}
+
+function renderMacros() {
+  const suppMacros = getSuppMacrosForDate(macroDate);
+  const mealMacros = getMealMacrosForDate(macroDate);
+  const goals = Store.getMacroGoals();
+  const meals = Store.getMealsForDate(macroDate);
+
+  const total = {
+    protein: suppMacros.protein + mealMacros.protein,
+    carbs: suppMacros.carbs + mealMacros.carbs,
+    fat: suppMacros.fat + mealMacros.fat
+  };
+
+  const date = dateObj(macroDate);
+  const dayLabel = `${DOW[date.getDay()]}, ${MON3[date.getMonth()]} ${date.getDate()}`;
+  const isToday = macroDate === todayStr();
+
+  const mealsHtml = meals.length === 0
+    ? `<div class="empty-hint">No meals logged yet — tap + Add Meal</div>`
+    : meals.map(m => `
+      <div class="meal-card">
+        <div class="meal-info">
+          <div class="meal-name">${esc(m.name || 'Meal')}</div>
+          <div class="meal-macros-row">
+            ${m.protein ? `<span class="meal-macro-chip protein">${m.protein}g protein</span>` : ''}
+            ${m.carbs   ? `<span class="meal-macro-chip carbs">${m.carbs}g carbs</span>`       : ''}
+            ${m.fat     ? `<span class="meal-macro-chip fat">${m.fat}g fat</span>`             : ''}
+          </div>
+        </div>
+        <button class="btn-icon" onclick="deleteMealEntry('${macroDate}','${m.id}')">🗑</button>
+      </div>`).join('');
+
+  const hasSuppMacros = (suppMacros.protein + suppMacros.carbs + suppMacros.fat) > 0;
+
+  document.getElementById('page-macros').innerHTML = `
+    <div class="page-header">
+      <div class="header-row">
+        <div>
+          <h2 class="page-title">Macros</h2>
+          <p class="page-subtitle">${dayLabel}</p>
+        </div>
+        <button class="btn-icon" id="macro-goals-btn" style="font-size:20px" title="Set Goals">🎯</button>
+      </div>
+      <div class="date-nav" style="margin-bottom:8px">
+        <button class="btn-icon" id="macro-prev-btn">&#8249;</button>
+        <button class="btn-secondary" id="macro-today-btn" style="font-size:13px;padding:6px 16px">${isToday ? 'Today' : 'Back to Today'}</button>
+        <button class="btn-icon" id="macro-next-btn">&#8250;</button>
+      </div>
+    </div>
+
+    <div class="macro-wheels">
+      ${macroWheel('Protein', total.protein, suppMacros.protein, goals.protein?.value ?? null, goals.protein?.type ?? null)}
+      ${macroWheel('Carbs',   total.carbs,   suppMacros.carbs,   goals.carbs?.value   ?? null, goals.carbs?.type   ?? null)}
+      ${macroWheel('Fat',     total.fat,     suppMacros.fat,     goals.fat?.value     ?? null, goals.fat?.type     ?? null)}
+    </div>
+
+    <div class="section">
+      <div class="section-header">
+        <span class="section-title">Meals</span>
+        <button class="btn-primary" id="add-meal-btn" style="font-size:13px;padding:7px 14px">+ Add Meal</button>
+      </div>
+      ${mealsHtml}
+    </div>
+
+    ${hasSuppMacros ? `
+    <div class="section">
+      <div class="section-title" style="margin-bottom:10px">From Supplements</div>
+      <div class="nutrient-totals">
+        ${suppMacros.protein > 0 ? `<div class="nutrient-total-row"><span class="nutrient-total-name" style="color:#4CAF50">Protein</span><span class="nutrient-total-val">${suppMacros.protein.toFixed(1)}g</span></div>` : ''}
+        ${suppMacros.carbs   > 0 ? `<div class="nutrient-total-row"><span class="nutrient-total-name" style="color:#4FC3F7">Carbs</span><span class="nutrient-total-val">${suppMacros.carbs.toFixed(1)}g</span></div>`   : ''}
+        ${suppMacros.fat     > 0 ? `<div class="nutrient-total-row"><span class="nutrient-total-name" style="color:#FFB612">Fat</span><span class="nutrient-total-val">${suppMacros.fat.toFixed(1)}g</span></div>`         : ''}
+      </div>
+    </div>` : ''}
+  `;
+
+  // Wire dynamic buttons
+  document.getElementById('macro-goals-btn').addEventListener('click', showMacroGoalsModal);
+  document.getElementById('add-meal-btn').addEventListener('click', showAddMealOverlay);
+  document.getElementById('macro-prev-btn').addEventListener('click', () => {
+    const d = dateObj(macroDate); d.setDate(d.getDate() - 1);
+    macroDate = d.toISOString().split('T')[0]; renderMacros();
+  });
+  document.getElementById('macro-next-btn').addEventListener('click', () => {
+    const d = dateObj(macroDate); d.setDate(d.getDate() + 1);
+    macroDate = d.toISOString().split('T')[0]; renderMacros();
+  });
+  document.getElementById('macro-today-btn').addEventListener('click', () => { macroDate = todayStr(); renderMacros(); });
+}
+
+function showMacroGoalsModal() {
+  const goals = Store.getMacroGoals();
+  ['protein', 'carbs', 'fat'].forEach(macro => {
+    const g = goals[macro] || {};
+    document.getElementById(`macro-${macro}-type`).value = g.type || 'max';
+    document.getElementById(`macro-${macro}-val`).value = g.value != null ? g.value : '';
+  });
+  document.getElementById('modal-macro-goals').style.display = 'flex';
+}
+
+function saveMacroGoals() {
+  const goals = {};
+  ['protein', 'carbs', 'fat'].forEach(macro => {
+    const type = document.getElementById(`macro-${macro}-type`).value;
+    const val = document.getElementById(`macro-${macro}-val`).value;
+    goals[macro] = { type, value: val !== '' ? parseFloat(val) : null };
+  });
+  Store.saveMacroGoals(goals);
+  document.getElementById('modal-macro-goals').style.display = 'none';
+  renderMacros();
+  toast('Goals saved', 'success');
+}
+
+function showAddMealOverlay() {
+  ['meal-name','meal-protein','meal-carbs','meal-fat'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('overlay-meal').classList.add('active');
+}
+
+function saveMeal() {
+  const name    = document.getElementById('meal-name').value.trim() || 'Meal';
+  const protein = parseFloat(document.getElementById('meal-protein').value) || 0;
+  const carbs   = parseFloat(document.getElementById('meal-carbs').value)   || 0;
+  const fat     = parseFloat(document.getElementById('meal-fat').value)     || 0;
+  if (!protein && !carbs && !fat) { toast('Enter at least one macro value', 'error'); return; }
+  Store.addMeal(macroDate, { name, protein, carbs, fat });
+  document.getElementById('overlay-meal').classList.remove('active');
+  renderMacros();
+  toast('Meal logged', 'success');
+}
+
+function deleteMealEntry(dateStr, mealId) {
+  Store.deleteMeal(dateStr, mealId);
+  renderMacros();
+}
+
+// ============================================================
 // NAVIGATION & INIT
 // ============================================================
 function showPage(name) {
@@ -2078,6 +2392,7 @@ function showPage(name) {
   if(name==='stack') renderStack();
   if(name==='calendar') renderCal();
   if(name==='metrics') renderMetrics();
+  if(name==='macros') renderMacros();
 }
 
 // Wire up navigation
@@ -2121,6 +2436,15 @@ document.getElementById('clear-data-btn').addEventListener('click',()=>{
     renderToday(); renderStack(); toast('All data cleared','warning');
   }
 });
+
+// Macro goals modal
+document.getElementById('macro-goals-cancel').addEventListener('click',()=>document.getElementById('modal-macro-goals').style.display='none');
+document.getElementById('macro-goals-save').addEventListener('click',saveMacroGoals);
+document.getElementById('modal-macro-goals').addEventListener('click',e=>{if(e.target===e.currentTarget)e.currentTarget.style.display='none';});
+
+// Add meal overlay
+document.getElementById('meal-cancel-btn').addEventListener('click',()=>document.getElementById('overlay-meal').classList.remove('active'));
+document.getElementById('meal-save-btn').addEventListener('click',saveMeal);
 
 // Close modals on backdrop click
 document.getElementById('modal-extra-doses').addEventListener('click',e=>{if(e.target===e.currentTarget)e.currentTarget.style.display='none';});
