@@ -1,8 +1,8 @@
-// Stack Tracker Service Worker
+// PepBros Gainz Service Worker
 // Network-first strategy: always fetches the latest version from GitHub when online.
 // Falls back to cache when offline. localStorage (your data) is never touched.
 
-const CACHE = 'stack-tracker-v1';
+const CACHE = 'pepbros-gainz-v1';
 
 self.addEventListener('install', () => {
   self.skipWaiting(); // activate immediately, don't wait for old SW to expire

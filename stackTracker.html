@@ -985,9 +985,8 @@ const OCR = (() => {
     const lines = t.split('\n').map(l => l.trim()).filter(Boolean);
     const r = {};
 
-    // For a line matching labelRe, return the first number in [minV,maxV] found by scanning:
-    // 1) the same line after the label keyword, then 2) the next `win` lines.
-    // Stops early on a line that looks like another tile label (letters with no digits).
+    // --- Strategy A: near-label (one-column layouts) ---
+    // Searches within `win` lines of the label, stops early on text-only "label" lines.
     function metric(labelRe, minV, maxV, win) {
       win = win == null ? 5 : win;
       for (let i = 0; i < lines.length; i++) {
@@ -995,7 +994,7 @@ const OCR = (() => {
         const search = [lines[i].replace(labelRe, '')].concat(lines.slice(i + 1, i + 1 + win));
         for (let s = 0; s < search.length; s++) {
           const sl = search[s];
-          if (s > 0 && /^[a-z]{3}/i.test(sl) && !/\d/.test(sl)) break; // another label line
+          if (s > 0 && /^[a-z]{3}/i.test(sl) && !/\d/.test(sl)) break;
           for (const m of sl.matchAll(/(\d+(?:\.\d+)?)/g)) {
             const v = parseFloat(m[1]);
             if (v >= minV && v <= maxV) return v;
@@ -1005,32 +1004,90 @@ const OCR = (() => {
       return null;
     }
 
-    // Weight: no unit required — scale tiles often render the unit as a superscript
-    // that OCR places on a separate line far from the number.
+    // --- Strategy B: wide-window lb search (two-column layouts) ---
+    // Searches up to `win` lines after the label for a line containing a lb/kg number.
+    // No early-stop — used when values are separated from labels by many label-only lines.
+    function metricLb(labelRe, minV, maxV, win) {
+      win = win == null ? 35 : win;
+      for (let i = 0; i < lines.length; i++) {
+        if (!labelRe.test(lines[i])) continue;
+        for (let j = i + 1; j <= Math.min(i + win, lines.length - 1); j++) {
+          const m = lines[j].match(/(\d+(?:\.\d+)?)\s*(?:lb|lbs|1b|ib|kg)/i);
+          if (!m) continue;
+          const v = parseFloat(m[1]);
+          if (v >= minV && v <= maxV) return v;
+        }
+      }
+      return null;
+    }
+
+    // --- WEIGHT ---
+    // Try near-label first; if that fails (two-column), take the largest lb/kg value.
     r.weight = metric(/\bweight\b/, 50, 700);
     if (r.weight != null) {
       const uMatch = t.match(/\b(lbs?|kg)\b/);
       r.weightUnit = uMatch && uMatch[1].startsWith('k') ? 'kg' : 'lbs';
     } else {
       let max = 0;
-      for (const m of [...t.matchAll(/(\d+(?:\.\d+)?)\s*(lbs?|kg)/g)]) {
+      for (const m of [...t.matchAll(/(\d+(?:\.\d+)?)\s*(?:lb|lbs|1b|ib|kg)/gi)]) {
         const v = parseFloat(m[1]);
-        if (v > max) { max = v; r.weight = v; r.weightUnit = m[2].startsWith('k') ? 'kg' : 'lbs'; }
+        if (v > max && v >= 50 && v <= 700) { max = v; r.weight = v; }
       }
+      if (r.weight != null) r.weightUnit = /\bkg\b/i.test(t) ? 'kg' : 'lbs';
     }
 
-    const bf = metric(/body\s*fat|fat\s*%/, 1, 70);
+    // --- BODY FAT % ---
+    // Near-label first. Two-column fallback: find first line that has BOTH a lb value
+    // AND a % value, where lb < 150 (body fat lbs, not lean mass or weight).
+    let bf = metric(/body\s*fat|fat\s*%/, 1, 70);
+    if (bf == null) {
+      for (const line of lines) {
+        const lbpct = line.match(/(\d+(?:\.\d+)?)\s*(?:lb|1b|ib).*?(\d+(?:\.\d+)?)\s*%/i);
+        if (!lbpct) continue;
+        const lbV = parseFloat(lbpct[1]);
+        const pctV = parseFloat(lbpct[2]);
+        // Body fat lb is typically 20–140 lbs (less than lean/fat-free mass)
+        if (lbV >= 10 && lbV < 150 && pctV >= 5 && pctV <= 65) { bf = pctV; break; }
+      }
+    }
     if (bf != null) r.bodyFat = bf;
 
+    // --- LEAN / MUSCLE MASS ---
+    // Near-label covers one-column; metricLb covers two-column (e.g. RENPHO "3 stats" section
+    // where "Fat-Free Mass" label is ~5 lines above its lb value).
     const lm = metric(/muscle\s*mass/, 50, 400)
       ?? metric(/fat.free\s*mass/, 50, 400)
-      ?? metric(/lean\s*mass/, 50, 400);
+      ?? metric(/lean\s*mass/, 50, 400)
+      ?? metric(/skeletal\s*muscle/, 50, 400)
+      ?? metricLb(/fat.free\s*mass/, 100, 300)
+      ?? metricLb(/muscle\s*mass/, 100, 300)
+      ?? metricLb(/skeletal\s*muscle/, 100, 300);
     if (lm != null) r.leanMass = lm;
 
-    const vf = metric(/visceral/, 1, 30);
+    // --- VISCERAL FAT ---
+    // Near-label first. Two-column fallback: a line that is ONLY an integer in [1,30],
+    // with no weight/unit text (lb, %, kcal, etc.).
+    let vf = metric(/visceral/, 1, 30);
+    if (vf == null) {
+      for (const line of lines) {
+        if (/(?:lb|1b|ib|kg|%|kcal)/i.test(line)) continue;
+        const m = line.match(/^(\d+)$/);
+        if (m) { const v = parseInt(m[1]); if (v >= 1 && v <= 30) { vf = v; break; } }
+      }
+    }
     if (vf != null) r.visceralFat = vf;
 
-    const bmi = metric(/\bbmi\b/, 10, 70);
+    // --- BMI ---
+    // Near-label first. Two-column fallback: a line that is ONLY a decimal in [15,60]
+    // with no units (lb, %, kcal).
+    let bmi = metric(/\bbmi\b/, 15, 60);
+    if (bmi == null) {
+      for (const line of lines) {
+        if (/(?:lb|1b|ib|kg|%|kcal)/i.test(line)) continue;
+        const m = line.match(/^(\d+\.\d+)$/);
+        if (m) { const v = parseFloat(m[1]); if (v >= 15 && v <= 60) { bmi = v; break; } }
+      }
+    }
     if (bmi != null) r.bmi = bmi;
 
     return r;
@@ -2197,10 +2254,14 @@ function getSuppMacrosForDate(dateStr) {
     const servings = (s.servingsPerDay || 1) + (log.supplements[s.id]?.extraDoses || 0);
     for (const n of (s.nutrients || [])) {
       const name = (n.name || '').toLowerCase();
-      const amt = (parseFloat(n.amount) || 0) * servings;
+      // Convert units to grams (nutrients may be stored in mg or mcg)
+      const unit = (n.unit || '').toLowerCase().trim();
+      const factor = unit === 'mg' ? 0.001 : unit === 'mcg' ? 0.000001 : 1;
+      const amt = (parseFloat(n.amount) || 0) * servings * factor;
       if (/protein/.test(name)) protein += amt;
       else if (/carb/.test(name)) carbs += amt;
-      else if (/fat/.test(name)) fat += amt;
+      // Use word-boundary \bfat\b so "fatty acids" and "omega-3 fatty acids" are excluded
+      else if (/\bfat\b/.test(name) && !/fatty|omega/i.test(name)) fat += amt;
     }
   }
   return { protein, carbs, fat };
