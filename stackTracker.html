@@ -1107,7 +1107,7 @@ function nutrientRow(n) {
   return `<div class="nutrient-total-row${cal?' calorie-row':''}"><span class="nutrient-total-name">${esc(n.name)}</span><span class="nutrient-total-val">${fmt(n.amount)}${n.unit?' '+esc(n.unit):''}</span></div>`;
 }
 function fmt(n) { return typeof n==='number' ? (n%1===0?n:n.toFixed(1)) : n; }
-function todayStr() { return new Date().toISOString().split('T')[0]; }
+function todayStr() { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 function dateObj(str) { return new Date(str+'T12:00:00'); }
 function isScheduledOn(supp, date) {
   const dow = (date instanceof Date ? date : dateObj(date)).getDay();
