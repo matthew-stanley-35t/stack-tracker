@@ -846,17 +846,31 @@ const OCR = (() => {
     const st  = document.getElementById(statusId);
     const tick = (pct, msg) => { if (bar) bar.style.width = pct+'%'; if (st) st.textContent = msg; };
 
-    tick(20, 'Uploading image…');
+    tick(10, 'Preparing image…');
 
-    // Convert file to base64 so fetch works from file:// (avoids FormData CORS issues on some browsers)
+    // Draw through a canvas: converts HEIC/PNG/etc → JPEG, compresses large camera photos,
+    // and ensures the MIME type we tell the API is always correct.
     const b64 = await new Promise((res, rej) => {
-      const reader = new FileReader();
-      reader.onload = e => res(e.target.result.split(',')[1]);
-      reader.onerror = rej;
-      reader.readAsDataURL(imageFile);
+      const img = new Image();
+      const url = URL.createObjectURL(imageFile);
+      img.onload = () => {
+        let w = img.naturalWidth, h = img.naturalHeight;
+        const maxPx = 1400; // keep well under 1 MB after base64 encoding
+        if (w > maxPx || h > maxPx) {
+          const ratio = Math.min(maxPx / w, maxPx / h);
+          w = Math.round(w * ratio); h = Math.round(h * ratio);
+        }
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        c.getContext('2d').drawImage(img, 0, 0, w, h);
+        URL.revokeObjectURL(url);
+        res(c.toDataURL('image/jpeg', 0.82).split(',')[1]);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('Could not load image — try a different photo')); };
+      img.src = url;
     });
 
-    tick(50, 'Scanning…');
+    tick(40, 'Uploading…');
 
     const body = new URLSearchParams({
       base64Image: 'data:image/jpeg;base64,' + b64,
@@ -1642,7 +1656,8 @@ async function handleSuppImage(e) {
     document.getElementById('nutrients-section').style.display='block';
   } catch(err) {
     document.getElementById('ocr-progress').style.display='none';
-    toast('OCR failed — add nutrients manually','error');
+    console.error('Supplement OCR error:', err);
+    toast('OCR failed: ' + (err?.message || 'check connection') + ' — add manually', 'error');
     currentNutrients=[{name:'',amount:'',unit:'mg'}];
     renderNutrientList();
     document.getElementById('nutrients-section').style.display='block';
@@ -2131,8 +2146,10 @@ async function handleScaleImage(e) {
   } catch(err){
     document.getElementById('metric-ocr-progress').style.display='none';
     document.getElementById('metric-ocr-status').style.display='block';
-    document.getElementById('metric-ocr-status').textContent='OCR failed — enter manually';
-    toast('OCR failed','error');
+    const msg = err?.message || 'check your connection';
+    document.getElementById('metric-ocr-status').textContent='OCR failed: ' + msg + ' — enter manually';
+    console.error('Scale OCR error:', err);
+    toast('OCR failed: ' + msg, 'error');
   }
 }
 
