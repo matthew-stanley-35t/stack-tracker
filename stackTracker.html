@@ -877,7 +877,11 @@ const OCR = (() => {
 
     tick(40, 'Uploading…');
 
+    // Send apikey as a form field (not a header) so the browser treats this as a
+    // "simple" CORS request with no preflight — custom headers trigger preflight
+    // which Safari iOS sometimes fails silently with "Load failed".
     const form = new FormData();
+    form.append('apikey', API_KEY);
     form.append('file', blob, 'image.jpg');
     form.append('language', 'eng');
     form.append('isOverlayRequired', 'false');
@@ -887,7 +891,6 @@ const OCR = (() => {
 
     const resp = await fetch('https://api.ocr.space/parse/image', {
       method: 'POST',
-      headers: { apikey: API_KEY },
       body: form,
     });
 

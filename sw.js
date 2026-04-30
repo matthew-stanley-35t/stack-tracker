@@ -2,7 +2,7 @@
 // Network-first strategy: always fetches the latest version from GitHub when online.
 // Falls back to cache when offline. localStorage (your data) is never touched.
 
-const CACHE = 'pepbros-gainz-v1';
+const CACHE = 'pepbros-gainz-v2';
 
 self.addEventListener('install', () => {
   self.skipWaiting(); // activate immediately, don't wait for old SW to expire
