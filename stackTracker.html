@@ -848,43 +848,47 @@ const OCR = (() => {
 
     tick(10, 'Preparing image…');
 
-    // Draw through a canvas: converts HEIC/PNG/etc → JPEG, compresses large camera photos,
-    // and ensures the MIME type we tell the API is always correct.
-    const b64 = await new Promise((res, rej) => {
+    // Compress via canvas (HEIC→JPEG, resize to ≤1200px) then send as FormData blob —
+    // FormData multipart avoids the ~33% base64 / URL-encoding size amplification that
+    // causes "Load failed" on iOS Safari with large URLSearchParams bodies.
+    const blob = await new Promise((res, rej) => {
       const img = new Image();
       const url = URL.createObjectURL(imageFile);
       img.onload = () => {
         let w = img.naturalWidth, h = img.naturalHeight;
-        const maxPx = 1400; // keep well under 1 MB after base64 encoding
+        const maxPx = 1200;
         if (w > maxPx || h > maxPx) {
-          const ratio = Math.min(maxPx / w, maxPx / h);
-          w = Math.round(w * ratio); h = Math.round(h * ratio);
+          const r = Math.min(maxPx / w, maxPx / h);
+          w = Math.round(w * r); h = Math.round(h * r);
         }
         const c = document.createElement('canvas');
         c.width = w; c.height = h;
         c.getContext('2d').drawImage(img, 0, 0, w, h);
         URL.revokeObjectURL(url);
-        res(c.toDataURL('image/jpeg', 0.82).split(',')[1]);
+        c.toBlob(b => b ? res(b) : rej(new Error('Canvas export failed')), 'image/jpeg', 0.82);
       };
-      img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('Could not load image — try a different photo')); };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        // Canvas decode failed (e.g. unsupported format) — fall back to raw file
+        res(imageFile);
+      };
       img.src = url;
     });
 
     tick(40, 'Uploading…');
 
-    const body = new URLSearchParams({
-      base64Image: 'data:image/jpeg;base64,' + b64,
-      language: 'eng',
-      isOverlayRequired: 'false',
-      detectOrientation: 'true',
-      scale: 'true',
-      OCREngine: '2',
-    });
+    const form = new FormData();
+    form.append('file', blob, 'image.jpg');
+    form.append('language', 'eng');
+    form.append('isOverlayRequired', 'false');
+    form.append('detectOrientation', 'true');
+    form.append('scale', 'true');
+    form.append('OCREngine', '2');
 
     const resp = await fetch('https://api.ocr.space/parse/image', {
       method: 'POST',
       headers: { apikey: API_KEY },
-      body,
+      body: form,
     });
 
     if (!resp.ok) throw new Error('OCR API error ' + resp.status);
