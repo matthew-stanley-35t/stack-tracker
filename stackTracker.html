@@ -288,6 +288,19 @@ details.stack-section[open] .collapse-arrow{transform:rotate(180deg)}
 .macro-goal-row .form-label{margin-bottom:0;min-width:60px}
 .macro-goal-type-sel{flex:1;background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;color:var(--text);-webkit-appearance:none;appearance:none}
 .macro-goal-val-inp{flex:1;background:var(--bg4);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:14px;color:var(--text)}
+/* 2x2 macro grid */
+.macro-wheels-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:24px}
+/* Today page collapsible sections */
+.today-section{margin-bottom:12px}
+.today-section-summary{display:flex;align-items:center;justify-content:space-between;cursor:pointer;list-style:none;padding:8px 0 6px;border-bottom:1px solid var(--border);margin-bottom:10px}
+.today-section-summary::-webkit-details-marker{display:none}
+.today-section-title{font-size:14px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px}
+.today-section-right{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text3)}
+details.today-section .today-collapse-arrow{transition:transform .2s;font-size:11px;color:var(--text3)}
+details.today-section[open] .today-collapse-arrow{transform:rotate(180deg)}
+/* Saved meals + meal save template */
+.saved-meal-row{margin-bottom:14px}
+.meal-save-row{display:flex;align-items:center;margin-top:14px;padding:12px 14px;background:var(--bg4);border-radius:10px;border:1px solid var(--border)}
 </style>
 </head>
 <body>
@@ -717,6 +730,14 @@ details.stack-section[open] .collapse-arrow{transform:rotate(180deg)}
     <div class="modal-title">Set Macro Goals</div>
     <p class="muted small" style="margin-bottom:16px">Set a minimum or maximum target for each macro. Leave the value blank to remove a goal.</p>
     <div class="macro-goal-row">
+      <label class="form-label" style="min-width:72px">Calories</label>
+      <select class="macro-goal-type-sel" id="macro-calories-type">
+        <option value="min">Min ≥</option>
+        <option value="max">Max ≤</option>
+      </select>
+      <input class="macro-goal-val-inp" id="macro-calories-val" type="number" min="0" placeholder="kcal/day">
+    </div>
+    <div class="macro-goal-row">
       <label class="form-label" style="min-width:72px">Protein</label>
       <select class="macro-goal-type-sel" id="macro-protein-type">
         <option value="min">Min ≥</option>
@@ -755,6 +776,29 @@ details.stack-section[open] .collapse-arrow{transform:rotate(180deg)}
     <button class="btn-link" style="color:var(--gold)" id="meal-save-btn">Save</button>
   </div>
   <div class="overlay-body">
+    <!-- Saved meals dropdown -->
+    <div class="saved-meal-row" id="saved-meal-row" style="display:none">
+      <label class="form-label">Load Saved Meal</label>
+      <div style="display:flex;gap:8px">
+        <select class="select" id="saved-meal-select" style="flex:1"><option value="">— select —</option></select>
+        <button class="btn-secondary" id="saved-meal-delete-btn" style="padding:10px 12px;font-size:16px;flex-shrink:0">🗑</button>
+      </div>
+    </div>
+    <!-- OCR scan -->
+    <div class="section-divider"></div>
+    <div class="form-label" style="margin-bottom:10px">Scan Nutrition Label (Optional)</div>
+    <label class="ocr-section" for="meal-image-input">
+      <div class="ocr-icon">📸</div>
+      <div class="ocr-hint">Tap to photograph or upload your nutrition label</div>
+      <div class="ocr-hint-small">Auto-fills calories, protein, carbs &amp; fat</div>
+    </label>
+    <input type="file" id="meal-image-input" accept="image/*" style="display:none">
+    <div id="meal-ocr-progress" style="display:none;padding:8px 0">
+      <div class="progress-bar-track"><div class="progress-bar-fill" id="meal-ocr-bar"></div></div>
+      <div class="ocr-status" id="meal-ocr-status">Scanning...</div>
+    </div>
+    <div class="section-divider"></div>
+    <!-- Fields -->
     <div class="form-group">
       <label class="form-label">Meal Name</label>
       <input class="input" id="meal-name" type="text" placeholder="e.g. Chicken &amp; Rice" autocomplete="off">
@@ -769,9 +813,22 @@ details.stack-section[open] .collapse-arrow{transform:rotate(180deg)}
         <input class="input" id="meal-carbs" type="number" min="0" step="0.1" placeholder="0">
       </div>
     </div>
-    <div class="form-group" style="max-width:50%">
-      <label class="form-label" style="color:#FFB612">Fat (g)</label>
-      <input class="input" id="meal-fat" type="number" min="0" step="0.1" placeholder="0">
+    <div class="input-row">
+      <div class="form-group">
+        <label class="form-label" style="color:#FFB612">Fat (g)</label>
+        <input class="input" id="meal-fat" type="number" min="0" step="0.1" placeholder="0">
+      </div>
+      <div class="form-group">
+        <label class="form-label" style="color:var(--gold)">Calories (kcal)</label>
+        <input class="input" id="meal-calories" type="number" min="0" step="1" placeholder="auto">
+      </div>
+    </div>
+    <!-- Save as template -->
+    <div class="meal-save-row">
+      <label style="display:flex;align-items:center;gap:10px;font-size:14px;cursor:pointer">
+        <input type="checkbox" id="meal-save-template" style="width:18px;height:18px;accent-color:var(--blue)">
+        Save as a template for future use
+      </label>
     </div>
   </div>
 </div>
@@ -786,7 +843,7 @@ details.stack-section[open] .collapse-arrow{transform:rotate(180deg)}
 // STORAGE
 // ============================================================
 const Store = (() => {
-  const K = { SUPPS:'st_supps', PEPS:'st_peps', LOGS:'st_logs', METRICS:'st_metrics', MACRO_GOALS:'st_macro_goals', MEALS:'st_meals' };
+  const K = { SUPPS:'st_supps', PEPS:'st_peps', LOGS:'st_logs', METRICS:'st_metrics', MACRO_GOALS:'st_macro_goals', MEALS:'st_meals', SAVED_MEALS:'st_saved_meals' };
   const get = k => { try { return JSON.parse(localStorage.getItem(k)) || []; } catch { return []; }};
   const getObj = k => { try { return JSON.parse(localStorage.getItem(k)) || {}; } catch { return {}; }};
   const set = (k,v) => localStorage.setItem(k, JSON.stringify(v));
@@ -830,7 +887,12 @@ const Store = (() => {
   const addMeal = (dateStr, meal) => { const m=_getMeals(); if(!m[dateStr]) m[dateStr]=[]; meal.id=uid(); m[dateStr].push(meal); localStorage.setItem(K.MEALS,JSON.stringify(m)); };
   const deleteMeal = (dateStr, mealId) => { const m=_getMeals(); if(m[dateStr]) m[dateStr]=m[dateStr].filter(x=>x.id!==mealId); localStorage.setItem(K.MEALS,JSON.stringify(m)); };
 
-  return { uid, getSupps, saveSupps, addSupp, updateSupp, deleteSupp, getPeps, savePeps, addPep, updatePep, deletePep, getLogs, getLog, saveLog, toggleSupp, setExtra, togglePep, getMetrics, addMetric, deleteMetric, updateMetric, getMacroGoals, saveMacroGoals, getMealsForDate, addMeal, deleteMeal };
+  // Saved meal templates
+  const getSavedMeals = () => get(K.SAVED_MEALS);
+  const addSavedMeal = m => { const a=getSavedMeals(); m.id=uid(); a.push(m); set(K.SAVED_MEALS,a); return m; };
+  const deleteSavedMeal = id => set(K.SAVED_MEALS, getSavedMeals().filter(m=>m.id!==id));
+
+  return { uid, getSupps, saveSupps, addSupp, updateSupp, deleteSupp, getPeps, savePeps, addPep, updatePep, deletePep, getLogs, getLog, saveLog, toggleSupp, setExtra, togglePep, getMetrics, addMetric, deleteMetric, updateMetric, getMacroGoals, saveMacroGoals, getMealsForDate, addMeal, deleteMeal, getSavedMeals, addSavedMeal, deleteSavedMeal };
 })();
 
 // ============================================================
@@ -1277,6 +1339,11 @@ function toast(msg, type='') {
 // ============================================================
 let todayPageDate = todayStr();
 
+// Persist open/closed state for today-page collapsible sections
+const TODAY_OPEN_KEY = 'st_today_open';
+function getTodayOpen() { try { return JSON.parse(localStorage.getItem(TODAY_OPEN_KEY)) || {}; } catch { return {}; } }
+function setTodayOpen(key, val) { const o = getTodayOpen(); o[key] = val; localStorage.setItem(TODAY_OPEN_KEY, JSON.stringify(o)); }
+
 function renderToday(dateStr) {
   if (dateStr) todayPageDate = dateStr;
   const date = dateObj(todayPageDate);
@@ -1285,13 +1352,137 @@ function renderToday(dateStr) {
   const peps = Store.getPeps().filter(p => isPepScheduledOn(p, date));
   const isToday = todayPageDate === todayStr();
 
-  const allDone = supps.length+peps.length > 0
-    && supps.every(s=>log.supplements[s.id]?.taken)
-    && peps.every(p=>log.peptides[p.id]?.taken);
+  const allDone = supps.length + peps.length > 0
+    && supps.every(s => log.supplements[s.id]?.taken)
+    && peps.every(p => log.peptides[p.id]?.taken);
 
   const dayLabel = `${DOW[date.getDay()]}, ${MON3[date.getMonth()]} ${date.getDate()}`;
+  const open = getTodayOpen();
+  // Default all sections open
+  const macroOpen  = open.macros  !== false;
+  const weightOpen = open.weight  !== false;
+  const pepOpen    = open.peps    !== false;
+  const suppOpen   = open.supps   !== false;
 
-  let html = `
+  // ---- Macros section ----
+  const suppMacros = getSuppMacrosForDate(todayPageDate);
+  const mealMacros = getMealMacrosForDate(todayPageDate);
+  const goals = Store.getMacroGoals();
+  const totalMacros = {
+    protein:  suppMacros.protein  + mealMacros.protein,
+    carbs:    suppMacros.carbs    + mealMacros.carbs,
+    fat:      suppMacros.fat      + mealMacros.fat,
+    calories: suppMacros.calories + mealMacros.calories
+  };
+  if (totalMacros.calories === 0 && (totalMacros.protein + totalMacros.carbs + totalMacros.fat) > 0) {
+    totalMacros.calories = Math.round(totalMacros.protein * 4 + totalMacros.carbs * 4 + totalMacros.fat * 9);
+  }
+
+  const macrosSection = `
+  <details class="today-section" id="ts-macros" ${macroOpen ? 'open' : ''}>
+    <summary class="today-section-summary">
+      <span class="today-section-title">Macros</span>
+      <span class="today-section-right">
+        ${totalMacros.calories > 0 ? `<span>${Math.round(totalMacros.calories)} kcal</span>` : ''}
+        <span class="today-collapse-arrow">▼</span>
+      </span>
+    </summary>
+    <div class="macro-wheels-grid" style="margin-top:8px">
+      ${macroWheel('Calories', totalMacros.calories, 0,                  goals.calories?.value ?? null, goals.calories?.type ?? null, 'kcal')}
+      ${macroWheel('Protein',  totalMacros.protein,  suppMacros.protein, goals.protein?.value  ?? null, goals.protein?.type  ?? null)}
+      ${macroWheel('Carbs',    totalMacros.carbs,    suppMacros.carbs,   goals.carbs?.value    ?? null, goals.carbs?.type    ?? null)}
+      ${macroWheel('Fat',      totalMacros.fat,      suppMacros.fat,     goals.fat?.value      ?? null, goals.fat?.type      ?? null)}
+    </div>
+  </details>`;
+
+  // ---- Weight chart section ----
+  const weightData = Store.getMetrics().filter(m => m.weight != null);
+  const weightSection = `
+  <details class="today-section" id="ts-weight" ${weightOpen ? 'open' : ''}>
+    <summary class="today-section-summary">
+      <span class="today-section-title">Weight</span>
+      <span class="today-section-right">
+        ${weightData.length > 0 ? `<span>${weightData[weightData.length-1].weight} ${weightData[weightData.length-1].weightUnit || 'lbs'}</span>` : ''}
+        <span class="today-collapse-arrow">▼</span>
+      </span>
+    </summary>
+    <div style="margin-top:8px">
+      ${weightData.length >= 2
+        ? `<canvas id="today-weight-chart" style="width:100%;border-radius:10px;display:block"></canvas>`
+        : `<div class="empty-hint">Log 2+ weight entries in Metrics to see chart</div>`}
+    </div>
+  </details>`;
+
+  // ---- Peptides section ----
+  let pepSection = '';
+  if (peps.length > 0) {
+    const takenCount = peps.filter(p => log.peptides[p.id]?.taken).length;
+    pepSection = `
+  <details class="today-section" id="ts-peps" ${pepOpen ? 'open' : ''}>
+    <summary class="today-section-summary">
+      <span class="today-section-title">Peptides</span>
+      <span class="today-section-right">
+        <span class="count-badge" style="font-size:11px">${takenCount}/${peps.length}</span>
+        <span class="today-collapse-arrow">▼</span>
+      </span>
+    </summary>
+    <div class="checkin-list" style="margin-top:8px">
+      ${peps.map(p => {
+        const taken = log.peptides[p.id]?.taken || false;
+        const c = calcUnits(p.mgPowder, p.bacMl, p.doseMcg);
+        return `<div class="checkin-row ${taken ? 'taken' : ''}">
+          <label class="checkin-label">
+            <input type="checkbox" class="pep-cb" data-id="${p.id}" ${taken ? 'checked' : ''}>
+            <span class="checkmark"></span>
+            <div class="checkin-info">
+              <span class="checkin-name"><span class="pep-dot" style="background:${p.color}"></span>${esc(p.name)}</span>
+              ${c ? `<span class="checkin-sub">${p.doseMcg} mcg · ${c.units} units</span>` : `<span class="checkin-sub">${freqLabel(p)}</span>`}
+            </div>
+          </label>
+        </div>`;
+      }).join('')}
+    </div>
+  </details>`;
+  }
+
+  // ---- Supplements section ----
+  let suppSection = '';
+  if (supps.length > 0) {
+    const takenCount = supps.filter(s => log.supplements[s.id]?.taken).length;
+    suppSection = `
+  <details class="today-section" id="ts-supps" ${suppOpen ? 'open' : ''}>
+    <summary class="today-section-summary">
+      <span class="today-section-title">Supplements</span>
+      <span class="today-section-right">
+        <span class="count-badge" style="font-size:11px">${takenCount}/${supps.length}</span>
+        <span class="today-collapse-arrow">▼</span>
+      </span>
+    </summary>
+    <div class="checkin-list" style="margin-top:8px">
+      ${supps.map(s => {
+        const slog = log.supplements[s.id] || { taken: false, extraDoses: 0 };
+        const extra = slog.extraDoses || 0;
+        return `<div class="checkin-row ${slog.taken ? 'taken' : ''}">
+          <label class="checkin-label">
+            <input type="checkbox" class="supp-cb" data-id="${s.id}" ${slog.taken ? 'checked' : ''}>
+            <span class="checkmark"></span>
+            <div class="checkin-info">
+              <span class="checkin-name">${esc(s.name)}</span>
+              ${s.brand ? `<span class="checkin-sub">${esc(s.brand)}</span>` : ''}
+            </div>
+          </label>
+          <button class="btn-extra extra-btn" data-id="${s.id}">${extra > 0 ? '+' + extra + ' extra' : '+ extra'}</button>
+        </div>`;
+      }).join('')}
+    </div>
+  </details>`;
+  }
+
+  if (supps.length === 0 && peps.length === 0) {
+    pepSection = `<div class="empty-state"><div class="empty-icon">💊</div><p>Nothing scheduled today.</p><p class="muted" style="font-size:13px;margin-top:8px">Add items from the Stack tab.</p></div>`;
+  }
+
+  const html = `
     <div class="header-row">
       <h2 class="page-title">Daily Check-in</h2>
     </div>
@@ -1303,105 +1494,44 @@ function renderToday(dateStr) {
       </div>
       <button class="btn-icon" id="next-day">&#8250;</button>
     </div>
-    ${allDone ? '<div class="all-done-badge">All done for today! ✓</div><br>' : ''}
+    ${allDone ? '<div class="all-done-badge">All done for today! ✓</div>' : ''}
+    ${macrosSection}
+    ${weightSection}
+    ${pepSection}
+    ${suppSection}
   `;
-
-  if (peps.length > 0) {
-    const takenCount = peps.filter(p=>log.peptides[p.id]?.taken).length;
-    html += `
-      <div class="section">
-        <div class="section-header">
-          <span class="section-title">Peptides</span>
-          <span class="count-badge">${takenCount}/${peps.length}</span>
-        </div>
-        <div class="checkin-list">
-          ${peps.map(p => {
-            const taken = log.peptides[p.id]?.taken || false;
-            const c = calcUnits(p.mgPowder, p.bacMl, p.doseMcg);
-            return `<div class="checkin-row ${taken?'taken':''}">
-              <label class="checkin-label">
-                <input type="checkbox" class="pep-cb" data-id="${p.id}" ${taken?'checked':''}>
-                <span class="checkmark"></span>
-                <div class="checkin-info">
-                  <span class="checkin-name"><span class="pep-dot" style="background:${p.color}"></span>${esc(p.name)}</span>
-                  ${c ? `<span class="checkin-sub">${p.doseMcg} mcg · ${c.units} units</span>` : `<span class="checkin-sub">${freqLabel(p)}</span>`}
-                </div>
-              </label>
-            </div>`;
-          }).join('')}
-        </div>
-      </div>`;
-  }
-
-  if (supps.length > 0) {
-    const takenCount = supps.filter(s=>log.supplements[s.id]?.taken).length;
-    html += `
-      <div class="section">
-        <div class="section-header">
-          <span class="section-title">Supplements</span>
-          <span class="count-badge">${takenCount}/${supps.length}</span>
-        </div>
-        <div class="checkin-list">
-          ${supps.map(s => {
-            const slog = log.supplements[s.id]||{taken:false,extraDoses:0};
-            const extra = slog.extraDoses||0;
-            return `<div class="checkin-row ${slog.taken?'taken':''}">
-              <label class="checkin-label">
-                <input type="checkbox" class="supp-cb" data-id="${s.id}" ${slog.taken?'checked':''}>
-                <span class="checkmark"></span>
-                <div class="checkin-info">
-                  <span class="checkin-name">${esc(s.name)}</span>
-                  ${s.brand ? `<span class="checkin-sub">${esc(s.brand)}</span>` : ''}
-                </div>
-              </label>
-              <button class="btn-extra extra-btn" data-id="${s.id}">${extra>0?'+'+extra+' extra':'+ extra'}</button>
-            </div>`;
-          }).join('')}
-        </div>
-      </div>`;
-  }
-
-  if (supps.length === 0 && peps.length === 0) {
-    html += `<div class="empty-state"><div class="empty-icon">💊</div><p>Nothing scheduled today.</p><p class="muted" style="font-size:13px;margin-top:8px">Add items from the Stack tab.</p></div>`;
-  }
-
-  // Nutrient totals for today
-  if (supps.length > 0) {
-    const totals = {};
-    for (const s of supps) {
-      const sl = log.supplements[s.id]||{taken:false,extraDoses:0};
-      const doses = (sl.taken?1:0)+(sl.extraDoses||0);
-      if (!doses) continue;
-      for (const n of (s.nutrients||[])) {
-        const key = n.name.toLowerCase();
-        if (!totals[key]) totals[key]={name:n.name,amount:0,unit:n.unit};
-        totals[key].amount += n.amount*doses;
-      }
-    }
-    const vals = Object.values(totals);
-    if (vals.length > 0) {
-      html += `<div class="section">
-        <div class="section-header"><span class="section-title">Nutrient Totals</span><span class="muted small">taken doses only</span></div>
-        <div class="nutrient-totals">${sortNutrients(vals).map(n=>nutrientRow(n)).join('')}</div>
-      </div>`;
-    }
-  }
 
   const container = document.getElementById('page-today');
   container.innerHTML = html;
 
-  document.getElementById('prev-day')?.addEventListener('click',()=>{ const d=dateObj(todayPageDate); d.setDate(d.getDate()-1); renderToday(d.toISOString().split('T')[0]); });
-  document.getElementById('next-day')?.addEventListener('click',()=>{ const d=dateObj(todayPageDate); d.setDate(d.getDate()+1); renderToday(d.toISOString().split('T')[0]); });
-  document.getElementById('goto-today')?.addEventListener('click',()=>renderToday(todayStr()));
+  // Draw weight chart after DOM insert
+  if (weightData.length >= 2) {
+    requestAnimationFrame(() => drawMetricChart('weight', 'today-weight-chart'));
+  }
 
-  container.querySelectorAll('.pep-cb').forEach(cb=>{
-    cb.addEventListener('change',e=>{ Store.togglePep(todayPageDate,e.target.dataset.id,e.target.checked); renderToday(); });
+  // Persist collapsible state
+  container.querySelectorAll('details.today-section').forEach(det => {
+    det.addEventListener('toggle', () => {
+      const key = det.id === 'ts-macros' ? 'macros'
+                : det.id === 'ts-weight' ? 'weight'
+                : det.id === 'ts-peps'   ? 'peps'
+                : det.id === 'ts-supps'  ? 'supps' : null;
+      if (key) setTodayOpen(key, det.open);
+    });
   });
-  container.querySelectorAll('.supp-cb').forEach(cb=>{
-    cb.addEventListener('change',e=>{ Store.toggleSupp(todayPageDate,e.target.dataset.id,e.target.checked); renderToday(); });
+
+  document.getElementById('prev-day')?.addEventListener('click', () => { const d = dateObj(todayPageDate); d.setDate(d.getDate() - 1); renderToday(d.toISOString().split('T')[0]); });
+  document.getElementById('next-day')?.addEventListener('click', () => { const d = dateObj(todayPageDate); d.setDate(d.getDate() + 1); renderToday(d.toISOString().split('T')[0]); });
+  document.getElementById('goto-today')?.addEventListener('click', () => renderToday(todayStr()));
+
+  container.querySelectorAll('.pep-cb').forEach(cb => {
+    cb.addEventListener('change', e => { Store.togglePep(todayPageDate, e.target.dataset.id, e.target.checked); renderToday(); });
   });
-  container.querySelectorAll('.extra-btn').forEach(btn=>{
-    btn.addEventListener('click',e=>showExtraDosesModal(e.target.dataset.id));
+  container.querySelectorAll('.supp-cb').forEach(cb => {
+    cb.addEventListener('change', e => { Store.toggleSupp(todayPageDate, e.target.dataset.id, e.target.checked); renderToday(); });
+  });
+  container.querySelectorAll('.extra-btn').forEach(btn => {
+    btn.addEventListener('click', e => showExtraDosesModal(e.target.dataset.id));
   });
 }
 
@@ -2059,8 +2189,8 @@ function renderMetrics() {
   if(metrics.length>1) drawMetricChart('weight');
 }
 
-function drawMetricChart(key) {
-  const canvas=document.getElementById('metrics-chart');
+function drawMetricChart(key, canvasId) {
+  const canvas=document.getElementById(canvasId||'metrics-chart');
   if(!canvas) return;
   const data=Store.getMetrics().filter(m=>m[key]!=null);
   const ctx=canvas.getContext('2d');
@@ -2277,35 +2407,37 @@ let macroDate = todayStr();
 function getSuppMacrosForDate(dateStr) {
   const log = Store.getLog(dateStr);
   const supps = Store.getSupps();
-  let protein = 0, carbs = 0, fat = 0;
+  let protein = 0, carbs = 0, fat = 0, calories = 0;
   for (const s of supps) {
     if (!log.supplements[s.id]?.taken) continue;
     const servings = (s.servingsPerDay || 1) + (log.supplements[s.id]?.extraDoses || 0);
     for (const n of (s.nutrients || [])) {
       const name = (n.name || '').toLowerCase();
-      // Convert units to grams (nutrients may be stored in mg or mcg)
       const unit = (n.unit || '').toLowerCase().trim();
       const factor = unit === 'mg' ? 0.001 : unit === 'mcg' ? 0.000001 : 1;
-      const amt = (parseFloat(n.amount) || 0) * servings * factor;
-      if (/protein/.test(name)) protein += amt;
+      const raw = (parseFloat(n.amount) || 0) * servings;
+      const amt = raw * factor;
+      if (/calorie/i.test(name)) calories += raw; // kcal — no unit conversion
+      else if (/protein/.test(name)) protein += amt;
       else if (/carb/.test(name)) carbs += amt;
-      // Use word-boundary \bfat\b so "fatty acids" and "omega-3 fatty acids" are excluded
       else if (/\bfat\b/.test(name) && !/fatty|omega/i.test(name)) fat += amt;
     }
   }
-  return { protein, carbs, fat };
+  return { protein, carbs, fat, calories };
 }
 
 function getMealMacrosForDate(dateStr) {
   const meals = Store.getMealsForDate(dateStr);
   return meals.reduce((acc, m) => ({
-    protein: acc.protein + (m.protein || 0),
-    carbs: acc.carbs + (m.carbs || 0),
-    fat: acc.fat + (m.fat || 0)
-  }), { protein: 0, carbs: 0, fat: 0 });
+    protein:  acc.protein  + (m.protein  || 0),
+    carbs:    acc.carbs    + (m.carbs    || 0),
+    fat:      acc.fat      + (m.fat      || 0),
+    calories: acc.calories + (m.calories || 0)
+  }), { protein: 0, carbs: 0, fat: 0, calories: 0 });
 }
 
-function macroWheel(label, current, suppAmt, goalValue, goalType) {
+function macroWheel(label, current, suppAmt, goalValue, goalType, unit) {
+  unit = unit || 'g';
   const r = 34, circ = +(2 * Math.PI * r).toFixed(1); // ≈213.6
   const target = goalValue || 0;
   const pct = target > 0 ? Math.min(current / target, 1) : 0;
@@ -2317,8 +2449,11 @@ function macroWheel(label, current, suppAmt, goalValue, goalType) {
     else if (goalType === 'min' && over) fillColor = '#4CAF50';
     else if (goalType === 'min' && !over) fillColor = '#0080C6';
   }
-  const goalLabel = goalValue != null ? `${goalType === 'min' ? '≥' : '≤'}${goalValue}g` : 'no goal';
+  const displayVal = unit === 'kcal' ? Math.round(current) : Math.round(current);
+  const goalLabel = goalValue != null ? `${goalType === 'min' ? '≥' : '≤'}${goalValue}${unit}` : 'no goal';
   const goalColor = goalValue != null ? '#8FA8C8' : '#5A7A9A';
+  // For calories, use smaller font since the number can be 4 digits
+  const valFontSize = unit === 'kcal' ? '13' : '16';
 
   return `<div class="macro-wheel-card">
     <svg viewBox="0 0 100 100" width="104" height="104">
@@ -2326,12 +2461,12 @@ function macroWheel(label, current, suppAmt, goalValue, goalType) {
       ${target > 0
         ? `<circle cx="50" cy="50" r="${r}" fill="none" stroke="${fillColor}" stroke-width="12" stroke-dasharray="${circ}" stroke-dashoffset="${offset}" stroke-linecap="round" transform="rotate(-90 50 50)"/>`
         : `<circle cx="50" cy="50" r="${r}" fill="none" stroke="#253860" stroke-width="12" stroke-dasharray="5 5"/>`}
-      <text x="50" y="47" text-anchor="middle" font-size="16" fill="#FFFFFF" font-weight="700" font-family="-apple-system,sans-serif">${Math.round(current)}g</text>
-      ${target > 0 ? `<text x="50" y="61" text-anchor="middle" font-size="9" fill="#8FA8C8" font-family="-apple-system,sans-serif">of ${target}g</text>` : ''}
+      <text x="50" y="47" text-anchor="middle" font-size="${valFontSize}" fill="#FFFFFF" font-weight="700" font-family="-apple-system,sans-serif">${displayVal}${unit}</text>
+      ${target > 0 ? `<text x="50" y="61" text-anchor="middle" font-size="9" fill="#8FA8C8" font-family="-apple-system,sans-serif">of ${target}${unit}</text>` : ''}
     </svg>
     <div class="macro-wheel-label">${label}</div>
     <div class="macro-goal-badge" style="color:${goalColor}">${goalLabel}</div>
-    ${suppAmt > 0 ? `<div class="macro-supp-note">+${Math.round(suppAmt)}g from supps</div>` : ''}
+    ${suppAmt > 0 && unit !== 'kcal' ? `<div class="macro-supp-note">+${Math.round(suppAmt)}${unit} supps</div>` : ''}
   </div>`;
 }
 
@@ -2342,10 +2477,15 @@ function renderMacros() {
   const meals = Store.getMealsForDate(macroDate);
 
   const total = {
-    protein: suppMacros.protein + mealMacros.protein,
-    carbs: suppMacros.carbs + mealMacros.carbs,
-    fat: suppMacros.fat + mealMacros.fat
+    protein:  suppMacros.protein  + mealMacros.protein,
+    carbs:    suppMacros.carbs    + mealMacros.carbs,
+    fat:      suppMacros.fat      + mealMacros.fat,
+    calories: suppMacros.calories + mealMacros.calories
   };
+  // If no explicit calorie data, auto-calc from macros
+  if (total.calories === 0 && (total.protein + total.carbs + total.fat) > 0) {
+    total.calories = Math.round(total.protein * 4 + total.carbs * 4 + total.fat * 9);
+  }
 
   const date = dateObj(macroDate);
   const dayLabel = `${DOW[date.getDay()]}, ${MON3[date.getMonth()]} ${date.getDate()}`;
@@ -2358,15 +2498,16 @@ function renderMacros() {
         <div class="meal-info">
           <div class="meal-name">${esc(m.name || 'Meal')}</div>
           <div class="meal-macros-row">
-            ${m.protein ? `<span class="meal-macro-chip protein">${m.protein}g protein</span>` : ''}
-            ${m.carbs   ? `<span class="meal-macro-chip carbs">${m.carbs}g carbs</span>`       : ''}
-            ${m.fat     ? `<span class="meal-macro-chip fat">${m.fat}g fat</span>`             : ''}
+            ${m.calories ? `<span class="meal-macro-chip" style="background:rgba(255,182,18,.15);color:#FFB612">${m.calories}kcal</span>` : ''}
+            ${m.protein  ? `<span class="meal-macro-chip protein">${m.protein}g protein</span>` : ''}
+            ${m.carbs    ? `<span class="meal-macro-chip carbs">${m.carbs}g carbs</span>`       : ''}
+            ${m.fat      ? `<span class="meal-macro-chip fat">${m.fat}g fat</span>`             : ''}
           </div>
         </div>
         <button class="btn-icon" onclick="deleteMealEntry('${macroDate}','${m.id}')">🗑</button>
       </div>`).join('');
 
-  const hasSuppMacros = (suppMacros.protein + suppMacros.carbs + suppMacros.fat) > 0;
+  const hasSuppMacros = (suppMacros.protein + suppMacros.carbs + suppMacros.fat + suppMacros.calories) > 0;
 
   document.getElementById('page-macros').innerHTML = `
     <div class="page-header">
@@ -2384,10 +2525,11 @@ function renderMacros() {
       </div>
     </div>
 
-    <div class="macro-wheels">
-      ${macroWheel('Protein', total.protein, suppMacros.protein, goals.protein?.value ?? null, goals.protein?.type ?? null)}
-      ${macroWheel('Carbs',   total.carbs,   suppMacros.carbs,   goals.carbs?.value   ?? null, goals.carbs?.type   ?? null)}
-      ${macroWheel('Fat',     total.fat,     suppMacros.fat,     goals.fat?.value     ?? null, goals.fat?.type     ?? null)}
+    <div class="macro-wheels-grid">
+      ${macroWheel('Calories', total.calories, 0,               goals.calories?.value ?? null, goals.calories?.type ?? null, 'kcal')}
+      ${macroWheel('Protein',  total.protein,  suppMacros.protein, goals.protein?.value ?? null, goals.protein?.type ?? null)}
+      ${macroWheel('Carbs',    total.carbs,    suppMacros.carbs,   goals.carbs?.value   ?? null, goals.carbs?.type   ?? null)}
+      ${macroWheel('Fat',      total.fat,      suppMacros.fat,     goals.fat?.value     ?? null, goals.fat?.type     ?? null)}
     </div>
 
     <div class="section">
@@ -2402,9 +2544,10 @@ function renderMacros() {
     <div class="section">
       <div class="section-title" style="margin-bottom:10px">From Supplements</div>
       <div class="nutrient-totals">
-        ${suppMacros.protein > 0 ? `<div class="nutrient-total-row"><span class="nutrient-total-name" style="color:#4CAF50">Protein</span><span class="nutrient-total-val">${suppMacros.protein.toFixed(1)}g</span></div>` : ''}
-        ${suppMacros.carbs   > 0 ? `<div class="nutrient-total-row"><span class="nutrient-total-name" style="color:#4FC3F7">Carbs</span><span class="nutrient-total-val">${suppMacros.carbs.toFixed(1)}g</span></div>`   : ''}
-        ${suppMacros.fat     > 0 ? `<div class="nutrient-total-row"><span class="nutrient-total-name" style="color:#FFB612">Fat</span><span class="nutrient-total-val">${suppMacros.fat.toFixed(1)}g</span></div>`         : ''}
+        ${suppMacros.calories > 0 ? `<div class="nutrient-total-row"><span class="nutrient-total-name" style="color:#FFB612">Calories</span><span class="nutrient-total-val">${Math.round(suppMacros.calories)} kcal</span></div>` : ''}
+        ${suppMacros.protein  > 0 ? `<div class="nutrient-total-row"><span class="nutrient-total-name" style="color:#4CAF50">Protein</span><span class="nutrient-total-val">${suppMacros.protein.toFixed(1)}g</span></div>` : ''}
+        ${suppMacros.carbs    > 0 ? `<div class="nutrient-total-row"><span class="nutrient-total-name" style="color:#4FC3F7">Carbs</span><span class="nutrient-total-val">${suppMacros.carbs.toFixed(1)}g</span></div>`   : ''}
+        ${suppMacros.fat      > 0 ? `<div class="nutrient-total-row"><span class="nutrient-total-name" style="color:#FFB612">Fat</span><span class="nutrient-total-val">${suppMacros.fat.toFixed(1)}g</span></div>`         : ''}
       </div>
     </div>` : ''}
   `;
@@ -2425,9 +2568,9 @@ function renderMacros() {
 
 function showMacroGoalsModal() {
   const goals = Store.getMacroGoals();
-  ['protein', 'carbs', 'fat'].forEach(macro => {
+  ['calories', 'protein', 'carbs', 'fat'].forEach(macro => {
     const g = goals[macro] || {};
-    document.getElementById(`macro-${macro}-type`).value = g.type || 'max';
+    document.getElementById(`macro-${macro}-type`).value = g.type || (macro === 'calories' ? 'min' : 'max');
     document.getElementById(`macro-${macro}-val`).value = g.value != null ? g.value : '';
   });
   document.getElementById('modal-macro-goals').style.display = 'flex';
@@ -2435,7 +2578,7 @@ function showMacroGoalsModal() {
 
 function saveMacroGoals() {
   const goals = {};
-  ['protein', 'carbs', 'fat'].forEach(macro => {
+  ['calories', 'protein', 'carbs', 'fat'].forEach(macro => {
     const type = document.getElementById(`macro-${macro}-type`).value;
     const val = document.getElementById(`macro-${macro}-val`).value;
     goals[macro] = { type, value: val !== '' ? parseFloat(val) : null };
@@ -2446,23 +2589,99 @@ function saveMacroGoals() {
   toast('Goals saved', 'success');
 }
 
+// Track whether user manually entered calories (disables auto-calc)
+let mealCalManual = false;
+
 function showAddMealOverlay() {
-  ['meal-name','meal-protein','meal-carbs','meal-fat'].forEach(id => {
+  ['meal-name','meal-protein','meal-carbs','meal-fat','meal-calories'].forEach(id => {
     document.getElementById(id).value = '';
   });
+  document.getElementById('meal-save-template').checked = false;
+  document.getElementById('meal-ocr-progress').style.display = 'none';
+  mealCalManual = false;
+  // Populate saved meals dropdown
+  const saved = Store.getSavedMeals();
+  const sel = document.getElementById('saved-meal-select');
+  sel.innerHTML = '<option value="">— select —</option>' +
+    saved.map(m => `<option value="${m.id}">${esc(m.name || 'Meal')}</option>`).join('');
+  document.getElementById('saved-meal-row').style.display = saved.length > 0 ? 'block' : 'none';
   document.getElementById('overlay-meal').classList.add('active');
 }
 
 function saveMeal() {
   const name    = document.getElementById('meal-name').value.trim() || 'Meal';
-  const protein = parseFloat(document.getElementById('meal-protein').value) || 0;
-  const carbs   = parseFloat(document.getElementById('meal-carbs').value)   || 0;
-  const fat     = parseFloat(document.getElementById('meal-fat').value)     || 0;
-  if (!protein && !carbs && !fat) { toast('Enter at least one macro value', 'error'); return; }
-  Store.addMeal(macroDate, { name, protein, carbs, fat });
+  const protein = parseFloat(document.getElementById('meal-protein').value)  || 0;
+  const carbs   = parseFloat(document.getElementById('meal-carbs').value)    || 0;
+  const fat     = parseFloat(document.getElementById('meal-fat').value)      || 0;
+  let calories  = parseFloat(document.getElementById('meal-calories').value) || 0;
+  if (!protein && !carbs && !fat && !calories) { toast('Enter at least one value', 'error'); return; }
+  // Auto-calc calories if not manually entered
+  if (!calories && (protein || carbs || fat)) {
+    calories = Math.round(protein * 4 + carbs * 4 + fat * 9);
+  }
+  const mealData = { name, protein, carbs, fat, calories };
+  Store.addMeal(macroDate, mealData);
+  // Save as template if checked
+  if (document.getElementById('meal-save-template').checked) {
+    Store.addSavedMeal({ name, protein, carbs, fat, calories });
+  }
   document.getElementById('overlay-meal').classList.remove('active');
   renderMacros();
   toast('Meal logged', 'success');
+}
+
+function autoCalcMealCals() {
+  if (mealCalManual) return; // user typed a value — don't overwrite
+  const p = parseFloat(document.getElementById('meal-protein').value) || 0;
+  const c = parseFloat(document.getElementById('meal-carbs').value)   || 0;
+  const f = parseFloat(document.getElementById('meal-fat').value)     || 0;
+  if (p || c || f) {
+    document.getElementById('meal-calories').value = Math.round(p * 4 + c * 4 + f * 9);
+  }
+}
+
+async function handleMealImage(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  document.getElementById('meal-ocr-progress').style.display = 'block';
+  document.getElementById('meal-ocr-bar').style.width = '0%';
+  document.getElementById('meal-ocr-status').textContent = 'Initializing...';
+  try {
+    const text = await OCR.recognize(file, 'meal-ocr-bar', 'meal-ocr-status');
+    // OCR.parseNutritionLabel returns an array of {name, amount, unit} nutrients
+    const nutrients = OCR.parseNutritionLabel(text);
+    const find = (re) => nutrients.find(n => re.test(n.name));
+    const toG = (n) => {
+      if (!n) return null;
+      const u = (n.unit || '').toLowerCase();
+      const v = n.amount;
+      if (u === 'mg') return +(v / 1000).toFixed(2);
+      if (u === 'mcg' || u === 'μg' || u === 'ug') return +(v / 1000000).toFixed(4);
+      return +v.toFixed(1);
+    };
+
+    const calNut  = find(/calorie/i);
+    const protNut = find(/protein/i);
+    const carbNut = find(/total\s+carb|carbohydrate/i);
+    const fatNut  = find(/total\s+fat/i);
+
+    if (protNut) document.getElementById('meal-protein').value  = toG(protNut);
+    if (carbNut) document.getElementById('meal-carbs').value    = toG(carbNut);
+    if (fatNut)  document.getElementById('meal-fat').value      = toG(fatNut);
+    if (calNut) {
+      document.getElementById('meal-calories').value = Math.round(calNut.amount);
+      mealCalManual = true;
+    } else {
+      mealCalManual = false;
+      autoCalcMealCals();
+    }
+    const found = [calNut && 'calories', protNut && 'protein', carbNut && 'carbs', fatNut && 'fat'].filter(Boolean);
+    toast(found.length > 0 ? `Found: ${found.join(', ')}` : 'No macros detected — enter manually', found.length > 0 ? 'success' : 'warning');
+  } catch(err) {
+    toast('OCR failed — enter manually', 'error');
+    document.getElementById('meal-ocr-status').textContent = 'OCR failed';
+  }
+  e.target.value = '';
 }
 
 function deleteMealEntry(dateStr, mealId) {
@@ -2535,6 +2754,38 @@ document.getElementById('modal-macro-goals').addEventListener('click',e=>{if(e.t
 // Add meal overlay
 document.getElementById('meal-cancel-btn').addEventListener('click',()=>document.getElementById('overlay-meal').classList.remove('active'));
 document.getElementById('meal-save-btn').addEventListener('click',saveMeal);
+document.getElementById('meal-image-input').addEventListener('change', handleMealImage);
+// Auto-calc calories when protein/carbs/fat change
+['meal-protein','meal-carbs','meal-fat'].forEach(id => {
+  document.getElementById(id).addEventListener('input', autoCalcMealCals);
+});
+// Mark calories as manually entered if user types it
+document.getElementById('meal-calories').addEventListener('input', () => { mealCalManual = true; });
+// Saved meal dropdown: preload fields on selection
+document.getElementById('saved-meal-select').addEventListener('change', e => {
+  const id = e.target.value;
+  if (!id) return;
+  const meal = Store.getSavedMeals().find(m => m.id === id);
+  if (!meal) return;
+  document.getElementById('meal-name').value     = meal.name     || '';
+  document.getElementById('meal-protein').value  = meal.protein  || '';
+  document.getElementById('meal-carbs').value    = meal.carbs    || '';
+  document.getElementById('meal-fat').value      = meal.fat      || '';
+  document.getElementById('meal-calories').value = meal.calories || '';
+  mealCalManual = !!meal.calories;
+});
+// Delete saved meal
+document.getElementById('saved-meal-delete-btn').addEventListener('click', () => {
+  const id = document.getElementById('saved-meal-select').value;
+  if (!id) { toast('Select a meal to delete', 'warning'); return; }
+  Store.deleteSavedMeal(id);
+  // Refresh dropdown
+  const sel = document.getElementById('saved-meal-select');
+  const saved = Store.getSavedMeals();
+  sel.innerHTML = '<option value="">— select —</option>' + saved.map(m => `<option value="${m.id}">${esc(m.name || 'Meal')}</option>`).join('');
+  document.getElementById('saved-meal-row').style.display = saved.length > 0 ? 'block' : 'none';
+  toast('Saved meal removed', 'success');
+});
 
 // Close modals on backdrop click
 document.getElementById('modal-extra-doses').addEventListener('click',e=>{if(e.target===e.currentTarget)e.currentTarget.style.display='none';});
