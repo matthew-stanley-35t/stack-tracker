@@ -889,15 +889,20 @@ const OCR = (() => {
     form.append('scale', 'true');
     form.append('OCREngine', '2');
 
-    const resp = await fetch('https://api.ocr.space/parse/image', {
-      method: 'POST',
-      body: form,
+    // Use XHR instead of fetch — fetch silently fails in iOS PWA context for some
+    // cross-origin requests, while XHR handles them correctly.
+    const responseText = await new Promise((res, rej) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', 'https://api.ocr.space/parse/image');
+      xhr.timeout = 30000;
+      xhr.onload = () => res(xhr.responseText);
+      xhr.onerror = () => rej(new Error('Network error — check connection'));
+      xhr.ontimeout = () => rej(new Error('Request timed out'));
+      xhr.send(form);
     });
 
-    if (!resp.ok) throw new Error('OCR API error ' + resp.status);
-    const json = await resp.json();
     tick(100, 'Done!');
-
+    const json = JSON.parse(responseText);
     if (json.IsErroredOnProcessing) throw new Error(json.ErrorMessage?.[0] || 'OCR failed');
     return json.ParsedResults?.[0]?.ParsedText || '';
   }
