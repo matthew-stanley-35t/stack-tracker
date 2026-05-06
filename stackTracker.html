@@ -194,6 +194,30 @@ img{max-width:100%;display:block}
 .day-detail-info{display:flex;align-items:center;gap:12px}
 .day-detail-name{font-size:15px;font-weight:600}
 .day-detail-sub{font-size:12px;color:var(--text2);margin-top:2px}
+.journal-section{margin-top:24px;padding-top:20px;border-top:1px solid var(--border)}
+.journal-section-title{font-size:15px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px}
+.journal-textarea{width:100%;min-height:110px;background:var(--bg4);border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:14px;color:var(--text);resize:vertical;line-height:1.5;transition:border-color .2s}
+.journal-textarea:focus{border-color:var(--blue);outline:none}
+.journal-textarea::placeholder{color:var(--text3)}
+.journal-save-row{display:flex;justify-content:flex-end;margin-top:10px}
+/* Rating widget */
+.rating-label{font-size:13px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px}
+.rating-row{display:flex;gap:8px;margin-bottom:16px}
+.rating-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 4px;border-radius:12px;border:2px solid var(--border);background:var(--bg4);cursor:pointer;transition:border-color .15s,background .15s}
+.rating-btn .rating-num{font-size:20px;font-weight:800;line-height:1}
+.rating-btn .rating-word{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.3px;color:var(--text3);line-height:1.2;text-align:center}
+.rating-btn[data-r="1"].active{border-color:#EF5350;background:rgba(239,83,80,.15)} .rating-btn[data-r="1"].active .rating-num{color:#EF5350}
+.rating-btn[data-r="2"].active{border-color:#FF8F00;background:rgba(255,143,0,.15)} .rating-btn[data-r="2"].active .rating-num{color:#FF8F00}
+.rating-btn[data-r="3"].active{border-color:#FFB612;background:rgba(255,182,18,.15)} .rating-btn[data-r="3"].active .rating-num{color:#FFB612}
+.rating-btn[data-r="4"].active{border-color:#66BB6A;background:rgba(102,187,106,.15)} .rating-btn[data-r="4"].active .rating-num{color:#66BB6A}
+.rating-btn[data-r="5"].active{border-color:#4CAF50;background:rgba(76,175,80,.18)} .rating-btn[data-r="5"].active .rating-num{color:#4CAF50}
+/* Calendar note dot — colour reflects mood rating */
+.cal-note-dot{display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--gold);margin-left:2px;vertical-align:middle;flex-shrink:0}
+.cal-note-dot[data-r="1"]{background:#EF5350}
+.cal-note-dot[data-r="2"]{background:#FF8F00}
+.cal-note-dot[data-r="3"]{background:#FFB612}
+.cal-note-dot[data-r="4"]{background:#66BB6A}
+.cal-note-dot[data-r="5"]{background:#4CAF50}
 .taken-toggle{font-size:13px;font-weight:600;padding:7px 14px;border-radius:8px;border:1px solid var(--border2);color:var(--text2);background:var(--bg3);cursor:pointer;white-space:nowrap}
 .taken-toggle.taken{background:rgba(76,175,80,.15);border-color:#2A5A2A;color:var(--success)}
 /* ===== METRICS ===== */
@@ -843,7 +867,7 @@ details.today-section[open] .today-collapse-arrow{transform:rotate(180deg)}
 // STORAGE
 // ============================================================
 const Store = (() => {
-  const K = { SUPPS:'st_supps', PEPS:'st_peps', LOGS:'st_logs', METRICS:'st_metrics', MACRO_GOALS:'st_macro_goals', MEALS:'st_meals', SAVED_MEALS:'st_saved_meals' };
+  const K = { SUPPS:'st_supps', PEPS:'st_peps', LOGS:'st_logs', METRICS:'st_metrics', MACRO_GOALS:'st_macro_goals', MEALS:'st_meals', SAVED_MEALS:'st_saved_meals', NOTES:'st_notes' };
   const get = k => { try { return JSON.parse(localStorage.getItem(k)) || []; } catch { return []; }};
   const getObj = k => { try { return JSON.parse(localStorage.getItem(k)) || {}; } catch { return {}; }};
   const set = (k,v) => localStorage.setItem(k, JSON.stringify(v));
@@ -892,7 +916,14 @@ const Store = (() => {
   const addSavedMeal = m => { const a=getSavedMeals(); m.id=uid(); a.push(m); set(K.SAVED_MEALS,a); return m; };
   const deleteSavedMeal = id => set(K.SAVED_MEALS, getSavedMeals().filter(m=>m.id!==id));
 
-  return { uid, getSupps, saveSupps, addSupp, updateSupp, deleteSupp, getPeps, savePeps, addPep, updatePep, deletePep, getLogs, getLog, saveLog, toggleSupp, setExtra, togglePep, getMetrics, addMetric, deleteMetric, updateMetric, getMacroGoals, saveMacroGoals, getMealsForDate, addMeal, deleteMeal, getSavedMeals, addSavedMeal, deleteSavedMeal };
+  // Day notes — stored as { "YYYY-MM-DD": "text", ... }
+  const _getNotes = () => { try { return JSON.parse(localStorage.getItem(K.NOTES)) || {}; } catch { return {}; }};
+  // Each entry is { text, rating } — handle legacy plain-string entries gracefully
+  const getDayEntry = dateStr => { const e=_getNotes()[dateStr]; if(!e) return {text:'',rating:0}; if(typeof e==='string') return {text:e,rating:0}; return e; };
+  const saveDayEntry = (dateStr, text, rating) => { const n=_getNotes(); const empty=!text.trim()&&!rating; if(empty) delete n[dateStr]; else n[dateStr]={text:text.trim(),rating:rating||0}; localStorage.setItem(K.NOTES,JSON.stringify(n)); };
+  const hasAnyNotes = () => _getNotes();
+
+  return { uid, getSupps, saveSupps, addSupp, updateSupp, deleteSupp, getPeps, savePeps, addPep, updatePep, deletePep, getLogs, getLog, saveLog, toggleSupp, setExtra, togglePep, getMetrics, addMetric, deleteMetric, updateMetric, getMacroGoals, saveMacroGoals, getMealsForDate, addMeal, deleteMeal, getSavedMeals, addSavedMeal, deleteSavedMeal, getDayEntry, saveDayEntry, hasAnyNotes };
 })();
 
 // ============================================================
@@ -2148,6 +2179,7 @@ function drawCalGrid() {
   const allPeps = Store.getPeps();
   const peps = calFilter==='all' ? allPeps.filter(p=>!p.vialEndedEarly) : allPeps.filter(p=>p.id===calFilter);
   const today = todayStr();
+  const allNotes = Store.hasAnyNotes();
 
   // getRemainingDoses counts from today (getDosesUsed only goes through yesterday).
   // Initialize pepDosesLeft from today's remaining budget.
@@ -2208,7 +2240,7 @@ function drawCalGrid() {
       const visibleSched=allSched.filter(p=>consumeFutureDose(p,ds));
       const taken=visibleSched.filter(p=>isPepEffectivelyTaken(p,ds));
       html+=`<div class="cal-cell ${ds===today?'today':''}" data-date="${ds}">
-        <span class="cal-day-num">${d}</span>
+        <span class="cal-day-num">${d}${allNotes[ds]?`<span class="cal-note-dot" data-r="${allNotes[ds]?.rating||0}" title="Journal entry"></span>`:''}</span>
         <div class="cal-dots">${visibleSched.map(p=>`<span class="cal-dot ${taken.find(t=>t.id===p.id)?'taken':'pending'}" style="background:${p.color}" title="${esc(p.name)}"></span>`).join('')}</div>
       </div>`;
     }
@@ -2229,7 +2261,7 @@ function drawCalGrid() {
       const visibleSched=allSched.filter(p=>consumeFutureDose(p,ds));
       const taken=visibleSched.filter(p=>isPepEffectivelyTaken(p,ds));
       html+=`<div class="cal-cell week-cell ${ds===today?'today':''}" data-date="${ds}">
-        <div class="week-cell-header"><span class="week-day-name">${dayNames[d.getDay()]}</span><span class="week-day-num">${d.getDate()}</span></div>
+        <div class="week-cell-header"><span class="week-day-name">${dayNames[d.getDay()]}</span><span class="week-day-num">${d.getDate()}${allNotes[ds]?`<span class="cal-note-dot" data-r="${allNotes[ds]?.rating||0}" title="Journal entry"></span>`:''}</span></div>
         <div class="week-peptides">${visibleSched.length===0?'<span class="muted" style="font-size:11px">Rest</span>':visibleSched.map(p=>`<div class="week-pep-row ${taken.find(t=>t.id===p.id)?'taken':''}"><span class="cal-dot" style="background:${p.color}"></span><span class="week-pep-name">${esc(p.name)}</span></div>`).join('')}</div>
       </div>`;
     }
@@ -2248,32 +2280,74 @@ function showDayDetail(dateStr) {
   const peps=Store.getPeps().filter(p=>isPepScheduledOn(p,date));
   document.getElementById('day-detail-title').textContent=`${DOW[date.getDay()]}, ${MON3[date.getMonth()]} ${date.getDate()}`;
   const body=document.getElementById('day-detail-body');
-  if(peps.length===0){body.innerHTML='<p class="muted">No peptides scheduled this day.</p>';}
-  else {
-    body.innerHTML=`<div class="day-detail-list">${peps.map(p=>{
-      const effectiveTaken=isPepEffectivelyTaken(p,dateStr);
-      const c=calcUnits(p.mgPowder,p.bacMl,p.doseMcg);
-      return `<div class="day-detail-row">
-        <div class="day-detail-info">
-          <span class="pep-dot large" style="background:${p.color}"></span>
-          <div>
-            <div class="day-detail-name">${esc(p.name)}</div>
-            <div class="day-detail-sub">${p.doseMcg} mcg${c?` · ${c.units} units`:''} · ${freqLabel(p)}</div>
+
+  const pepHtml = peps.length===0
+    ? '<p class="muted">No peptides scheduled this day.</p>'
+    : `<div class="day-detail-list">${peps.map(p=>{
+        const effectiveTaken=isPepEffectivelyTaken(p,dateStr);
+        const c=calcUnits(p.mgPowder,p.bacMl,p.doseMcg);
+        return `<div class="day-detail-row">
+          <div class="day-detail-info">
+            <span class="pep-dot large" style="background:${p.color}"></span>
+            <div>
+              <div class="day-detail-name">${esc(p.name)}</div>
+              <div class="day-detail-sub">${p.doseMcg} mcg${c?` · ${c.units} units`:''} · ${freqLabel(p)}</div>
+            </div>
           </div>
-        </div>
-        <div class="taken-toggle ${effectiveTaken?'taken':''}" data-id="${p.id}" data-date="${dateStr}">${effectiveTaken?'✓ Taken':'○ Pending'}</div>
-      </div>`;
-    }).join('')}</div>`;
-    body.querySelectorAll('.taken-toggle').forEach(el=>{
-      el.addEventListener('click',()=>{
-        const isTaken=el.classList.contains('taken');
-        Store.togglePep(el.dataset.date,el.dataset.id,!isTaken);
-        el.classList.toggle('taken',!isTaken);
-        el.textContent=!isTaken?'✓ Taken':'○ Pending';
-        drawCalGrid(); renderToday();
-      });
+          <div class="taken-toggle ${effectiveTaken?'taken':''}" data-id="${p.id}" data-date="${dateStr}">${effectiveTaken?'✓ Taken':'○ Pending'}</div>
+        </div>`;
+      }).join('')}</div>`;
+
+  const entry = Store.getDayEntry(dateStr);
+  const RATINGS = ['','Dogshit','Rough','Decent','Good','Super Saiyan'];
+  const journalHtml = `
+    <div class="journal-section">
+      <div class="journal-section-title">📓 Journal Entry</div>
+      <div class="rating-label">How did you feel?</div>
+      <div class="rating-row">
+        ${[1,2,3,4,5].map(r=>`
+          <button class="rating-btn ${entry.rating===r?'active':''}" data-r="${r}">
+            <span class="rating-num">${r}</span>
+            <span class="rating-word">${RATINGS[r]}</span>
+          </button>`).join('')}
+      </div>
+      <textarea class="journal-textarea" id="journal-text-input" placeholder="How was your day? Any notes on training, sleep, mood…">${esc(entry.text)}</textarea>
+      <div class="journal-save-row">
+        <button class="btn-primary" id="journal-save-btn" style="font-size:13px;padding:8px 20px">Save Entry</button>
+      </div>
+    </div>`;
+
+  body.innerHTML = pepHtml + journalHtml;
+
+  body.querySelectorAll('.taken-toggle').forEach(el=>{
+    el.addEventListener('click',()=>{
+      const isTaken=el.classList.contains('taken');
+      Store.togglePep(el.dataset.date,el.dataset.id,!isTaken);
+      el.classList.toggle('taken',!isTaken);
+      el.textContent=!isTaken?'✓ Taken':'○ Pending';
+      drawCalGrid(); renderToday();
     });
-  }
+  });
+
+  // Rating button selection
+  let selectedRating = entry.rating || 0;
+  body.querySelectorAll('.rating-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const r = parseInt(btn.dataset.r);
+      // Tap same rating again to deselect
+      selectedRating = selectedRating === r ? 0 : r;
+      body.querySelectorAll('.rating-btn').forEach(b=>b.classList.toggle('active', parseInt(b.dataset.r)===selectedRating));
+    });
+  });
+
+  document.getElementById('journal-save-btn').addEventListener('click',()=>{
+    const text = document.getElementById('journal-text-input').value;
+    Store.saveDayEntry(dateStr, text, selectedRating);
+    drawCalGrid();
+    const hasContent = text.trim() || selectedRating;
+    toast(hasContent ? 'Journal entry saved' : 'Entry cleared', 'success');
+  });
+
   document.getElementById('overlay-day-detail').classList.add('active');
 }
 
