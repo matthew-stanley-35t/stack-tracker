@@ -1188,13 +1188,140 @@ const OCR = (() => {
 // HELPERS
 // ============================================================
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-function isCalorie(n) { return /calorie/i.test(n.name); }
-function sortNutrients(arr) { return [...arr].sort((a,b) => isCalorie(b)-isCalorie(a)); }
+function fmt(n) { return typeof n==='number' ? (n%1===0?n:+n.toFixed(2)) : n; }
+
+// ---- Nutrient normalisation ----
+// Maps any label name to a canonical key used for grouping.
+// Key format: "canonical_name|||unit" — keeps units separate so
+// "Vitamin D 125 mcg" and "Vitamin D 5000 IU" don't silently merge.
+function normalizeUnit(u) {
+  const s = (u||'').toLowerCase().trim();
+  if (/^(mcg|μg|ug)$/.test(s)) return 'mcg';
+  if (s === 'mg') return 'mg';
+  if (s === 'g')  return 'g';
+  if (/^(iu|international\s*units?)$/.test(s)) return 'IU';
+  if (/^(kcal|cal|calories?)$/.test(s)) return 'kcal';
+  return s;
+}
+
+function normalizeNutrientKey(name) {
+  // Strip parenthetical form descriptors: "(as D3 Cholecalciferol)", "(from ...)"
+  let s = (name || '').toLowerCase()
+    .replace(/\(as\s+[^)]+\)/g, '')
+    .replace(/\(from\s+[^)]+\)/g, '')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  // ---- Vitamins ----
+  // Vitamin D: "D", "D3", "D2", "Vitamin D3", "Cholecalciferol", "Ergocalciferol"
+  if (/^d[23]?$/.test(s) || /vitamin\s+d/.test(s) || /cholecalciferol/.test(s) || /ergocalciferol/.test(s)) return 'vitamin d';
+  // Vitamin C
+  if (/vitamin\s+c/.test(s) || /ascorbic\s+acid/.test(s) || /\bascorbate/.test(s)) return 'vitamin c';
+  // Vitamin E
+  if (/vitamin\s+e/.test(s) || /\btocopherol/.test(s)) return 'vitamin e';
+  // Vitamin A
+  if (/vitamin\s+a/.test(s) || /\bretinol/.test(s) || /\bretinyl/.test(s) || /beta.?carotene/.test(s)) return 'vitamin a';
+  // Vitamin K — K1 ≠ K2 (different nutrients)
+  if (/vitamin\s+k1/.test(s) || /phylloquinone/.test(s)) return 'vitamin k1';
+  if (/vitamin\s+k2/.test(s) || /menaquinone/.test(s) || /\bmk\s*\d/.test(s)) return 'vitamin k2';
+  if (/vitamin\s+k(?!\d)/.test(s) || /\bk(?!\d|[a-z])/.test(s)) return 'vitamin k';
+  // B vitamins — ALL distinct, must NOT merge with each other
+  if (/vitamin\s+b\s*1\b/.test(s) || /\bthiamin/.test(s)) return 'vitamin b1';
+  if (/vitamin\s+b\s*2\b/.test(s) || /\briboflavin/.test(s)) return 'vitamin b2';
+  if (/vitamin\s+b\s*3\b/.test(s) || /\bniacin/.test(s) || /nicotinic\s+acid/.test(s) || /nicotinamide/.test(s)) return 'vitamin b3';
+  if (/vitamin\s+b\s*5\b/.test(s) || /pantothenic/.test(s)) return 'vitamin b5';
+  if (/vitamin\s+b\s*6\b/.test(s) || /pyridoxine/.test(s) || /pyridoxal/.test(s) || /pyridoxamine/.test(s)) return 'vitamin b6';
+  if (/vitamin\s+b\s*7\b/.test(s) || /\bbiotin/.test(s)) return 'biotin';
+  if (/vitamin\s+b\s*9\b/.test(s) || /\bfolate/.test(s) || /folic\s+acid/.test(s) || /\bfolacin/.test(s)) return 'folate';
+  if (/vitamin\s+b\s*12\b/.test(s) || /cobalamin/.test(s) || /cyanocobalamin/.test(s) || /methylcobalamin/.test(s)) return 'vitamin b12';
+  // Catch generic "Vitamin B" without a number (unlikely but possible)
+  if (/^vitamin\s+b$/.test(s)) return 'vitamin b (complex)';
+
+  // ---- Minerals — combine all chelated/salt forms ----
+  if (/^magnesium/.test(s) || /^mag\b/.test(s)) return 'magnesium';
+  if (/^calcium/.test(s)) return 'calcium';
+  if (/^zinc/.test(s)) return 'zinc';
+  if (/^iron/.test(s) || /\bferrous/.test(s) || /\bferric/.test(s)) return 'iron';
+  if (/^potassium/.test(s)) return 'potassium';
+  if (/^sodium/.test(s)) return 'sodium';
+  if (/^iodine/.test(s) || /\biodide/.test(s)) return 'iodine';
+  if (/^selenium/.test(s) || /selenomethionine/.test(s)) return 'selenium';
+  if (/^chromium/.test(s)) return 'chromium';
+  if (/^copper/.test(s)) return 'copper';
+  if (/^manganese/.test(s)) return 'manganese';
+  if (/^molybdenum/.test(s)) return 'molybdenum';
+  if (/^phosphorus/.test(s)) return 'phosphorus';
+  if (/^boron/.test(s)) return 'boron';
+  if (/^vanadium/.test(s)) return 'vanadium';
+  if (/^silicon/.test(s) || /silica/.test(s)) return 'silicon';
+
+  // ---- Macros / calories ----
+  if (/calorie/.test(s)) return 'calories';
+  if (/\bprotein/.test(s)) return 'protein';
+  if (/total\s+fat|^fat$/.test(s)) return 'fat';
+  if (/total\s+carb|carbohydrate/.test(s)) return 'carbohydrates';
+  if (/dietary\s+fiber|\bfiber/.test(s)) return 'fiber';
+  if (/total\s+sugar|\bsugar/.test(s)) return 'sugars';
+  if (/sodium/.test(s)) return 'sodium';
+  if (/saturated\s+fat/.test(s)) return 'saturated fat';
+  if (/trans\s+fat/.test(s)) return 'trans fat';
+  if (/cholesterol/.test(s)) return 'cholesterol';
+
+  // Default: return cleaned string
+  return s;
+}
+
+// Pretty display name for a canonical key
+const NUTRIENT_DISPLAY = {
+  'vitamin a':'Vitamin A','vitamin c':'Vitamin C','vitamin d':'Vitamin D',
+  'vitamin e':'Vitamin E','vitamin k':'Vitamin K','vitamin k1':'Vitamin K1',
+  'vitamin k2':'Vitamin K2','vitamin b1':'Vitamin B1 (Thiamin)',
+  'vitamin b2':'Vitamin B2 (Riboflavin)','vitamin b3':'Vitamin B3 (Niacin)',
+  'vitamin b5':'Vitamin B5 (Pantothenic Acid)','vitamin b6':'Vitamin B6',
+  'biotin':'Biotin (B7)','folate':'Folate (B9)','vitamin b12':'Vitamin B12',
+  'vitamin b (complex)':'Vitamin B Complex',
+  'magnesium':'Magnesium','calcium':'Calcium','zinc':'Zinc','iron':'Iron',
+  'potassium':'Potassium','sodium':'Sodium','iodine':'Iodine','selenium':'Selenium',
+  'chromium':'Chromium','copper':'Copper','manganese':'Manganese',
+  'molybdenum':'Molybdenum','phosphorus':'Phosphorus','boron':'Boron',
+  'vanadium':'Vanadium','silicon':'Silicon',
+  'calories':'Calories','protein':'Protein','fat':'Fat',
+  'carbohydrates':'Carbohydrates','fiber':'Fiber','sugars':'Sugars',
+  'saturated fat':'Saturated Fat','trans fat':'Trans Fat',
+  'cholesterol':'Cholesterol',
+};
+
+// Accumulate an array of {name, amount, unit} into a totals object.
+// factor = multiplier (e.g. servings per day). Skips zero amounts.
+function accumulateNutrients(acc, nutrients, factor) {
+  factor = factor || 1;
+  for (const n of (nutrients || [])) {
+    const raw = (parseFloat(n.amount) || 0) * factor;
+    if (raw === 0) continue;
+    const canonKey = normalizeNutrientKey(n.name);
+    const unitKey  = normalizeUnit(n.unit);
+    const key = canonKey + '|||' + unitKey;
+    if (!acc[key]) {
+      const displayName = NUTRIENT_DISPLAY[canonKey]
+        || (n.name.trim().charAt(0).toUpperCase() + n.name.trim().slice(1));
+      acc[key] = { name: displayName, amount: 0, unit: unitKey, _calorie: canonKey === 'calories' };
+    }
+    acc[key].amount += raw;
+  }
+}
+
+function isCalorie(n) { return n._calorie || /calorie/i.test(n.name); }
+function sortNutrients(arr) {
+  return [...arr].sort((a, b) => {
+    if (isCalorie(b) !== isCalorie(a)) return isCalorie(b) ? 1 : -1;
+    return (a.name || '').localeCompare(b.name || '');
+  });
+}
 function nutrientRow(n) {
   const cal = isCalorie(n);
   return `<div class="nutrient-total-row${cal?' calorie-row':''}"><span class="nutrient-total-name">${esc(n.name)}</span><span class="nutrient-total-val">${fmt(n.amount)}${n.unit?' '+esc(n.unit):''}</span></div>`;
 }
-function fmt(n) { return typeof n==='number' ? (n%1===0?n:n.toFixed(1)) : n; }
 function todayStr() { const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 function dateObj(str) { return new Date(str+'T12:00:00'); }
 function isScheduledOn(supp, date) {
@@ -1482,6 +1609,32 @@ function renderToday(dateStr) {
     pepSection = `<div class="empty-state"><div class="empty-icon">💊</div><p>Nothing scheduled today.</p><p class="muted" style="font-size:13px;margin-top:8px">Add items from the Stack tab.</p></div>`;
   }
 
+  // ---- Nutrient Totals section: taken supps + logged meals ----
+  const nutrientOpen = open.nutrients !== false;
+  const todayNutAcc = {};
+  for (const s of supps) {
+    if (!log.supplements[s.id]?.taken) continue;
+    const servings = (s.servingsPerDay || 1) + (log.supplements[s.id]?.extraDoses || 0);
+    accumulateNutrients(todayNutAcc, s.nutrients, servings);
+  }
+  const todayMealNuts = getMealNutrientsForDate(todayPageDate);
+  for (const [key, entry] of Object.entries(todayMealNuts)) {
+    if (!todayNutAcc[key]) todayNutAcc[key] = { ...entry, amount: 0 };
+    todayNutAcc[key].amount += entry.amount;
+  }
+  const todayNutRows = sortNutrients(Object.values(todayNutAcc).filter(n => n.amount > 0));
+  const nutrientSection = todayNutRows.length > 0 ? `
+  <details class="today-section" id="ts-nutrients" ${nutrientOpen ? 'open' : ''}>
+    <summary class="today-section-summary">
+      <span class="today-section-title">Nutrient Totals</span>
+      <span class="today-section-right">
+        <span style="font-size:11px;color:var(--text3)">taken doses</span>
+        <span class="today-collapse-arrow">▼</span>
+      </span>
+    </summary>
+    <div class="nutrient-totals" style="margin-top:8px">${todayNutRows.map(n => nutrientRow(n)).join('')}</div>
+  </details>` : '';
+
   const html = `
     <div class="header-row">
       <h2 class="page-title">Daily Check-in</h2>
@@ -1499,6 +1652,7 @@ function renderToday(dateStr) {
     ${weightSection}
     ${pepSection}
     ${suppSection}
+    ${nutrientSection}
   `;
 
   const container = document.getElementById('page-today');
@@ -1512,10 +1666,11 @@ function renderToday(dateStr) {
   // Persist collapsible state
   container.querySelectorAll('details.today-section').forEach(det => {
     det.addEventListener('toggle', () => {
-      const key = det.id === 'ts-macros' ? 'macros'
-                : det.id === 'ts-weight' ? 'weight'
-                : det.id === 'ts-peps'   ? 'peps'
-                : det.id === 'ts-supps'  ? 'supps' : null;
+      const key = det.id === 'ts-macros'     ? 'macros'
+                : det.id === 'ts-weight'     ? 'weight'
+                : det.id === 'ts-peps'       ? 'peps'
+                : det.id === 'ts-supps'      ? 'supps'
+                : det.id === 'ts-nutrients'  ? 'nutrients' : null;
       if (key) setTodayOpen(key, det.open);
     });
   });
@@ -1611,23 +1766,17 @@ function renderStack() {
     </details>
   `;
 
-  // Stack-wide nutrient totals
+  // Stack-wide nutrient totals (all supps × servings/day, normalised + merged)
   const totals = {};
-  for (const s of supps) {
-    for (const n of (s.nutrients||[])) {
-      const k = n.name.toLowerCase();
-      if (!totals[k]) totals[k]={name:n.name,amount:0,unit:n.unit};
-      totals[k].amount += n.amount*(s.servingsPerDay||1);
-    }
-  }
-  const tvals = Object.values(totals);
-  if (tvals.length>0) {
+  for (const s of supps) accumulateNutrients(totals, s.nutrients, s.servingsPerDay || 1);
+  const tvals = sortNutrients(Object.values(totals).filter(n => n.amount > 0));
+  if (tvals.length > 0) {
     html += `<details class="stack-section" open>
       <summary class="stack-section-summary">
         <span class="section-title">Total Daily Nutrients</span>
         <span class="section-right"><span class="muted small">full stack</span><span class="collapse-arrow">▼</span></span>
       </summary>
-      <div class="nutrient-totals">${sortNutrients(tvals).map(n=>nutrientRow(n)).join('')}</div>
+      <div class="nutrient-totals">${tvals.map(n=>nutrientRow(n)).join('')}</div>
     </details>`;
   }
 
@@ -2507,7 +2656,24 @@ function renderMacros() {
         <button class="btn-icon" onclick="deleteMealEntry('${macroDate}','${m.id}')">🗑</button>
       </div>`).join('');
 
-  const hasSuppMacros = (suppMacros.protein + suppMacros.carbs + suppMacros.fat + suppMacros.calories) > 0;
+  // Build combined nutrient totals: taken supplements + logged meals (both normalised)
+  const log = Store.getLog(macroDate);
+  const allSupps = Store.getSupps();
+  const nutrientAcc = {};
+  for (const s of allSupps) {
+    if (!log.supplements[s.id]?.taken) continue;
+    const servings = (s.servingsPerDay || 1) + (log.supplements[s.id]?.extraDoses || 0);
+    accumulateNutrients(nutrientAcc, s.nutrients, servings);
+  }
+  // Merge meal nutrients
+  const mealNutAcc = getMealNutrientsForDate(macroDate);
+  for (const [key, entry] of Object.entries(mealNutAcc)) {
+    if (!nutrientAcc[key]) {
+      nutrientAcc[key] = { ...entry, amount: 0 };
+    }
+    nutrientAcc[key].amount += entry.amount;
+  }
+  const nutrientRows = sortNutrients(Object.values(nutrientAcc).filter(n => n.amount > 0));
 
   document.getElementById('page-macros').innerHTML = `
     <div class="page-header">
@@ -2540,15 +2706,10 @@ function renderMacros() {
       ${mealsHtml}
     </div>
 
-    ${hasSuppMacros ? `
+    ${nutrientRows.length > 0 ? `
     <div class="section">
-      <div class="section-title" style="margin-bottom:10px">From Supplements</div>
-      <div class="nutrient-totals">
-        ${suppMacros.calories > 0 ? `<div class="nutrient-total-row"><span class="nutrient-total-name" style="color:#FFB612">Calories</span><span class="nutrient-total-val">${Math.round(suppMacros.calories)} kcal</span></div>` : ''}
-        ${suppMacros.protein  > 0 ? `<div class="nutrient-total-row"><span class="nutrient-total-name" style="color:#4CAF50">Protein</span><span class="nutrient-total-val">${suppMacros.protein.toFixed(1)}g</span></div>` : ''}
-        ${suppMacros.carbs    > 0 ? `<div class="nutrient-total-row"><span class="nutrient-total-name" style="color:#4FC3F7">Carbs</span><span class="nutrient-total-val">${suppMacros.carbs.toFixed(1)}g</span></div>`   : ''}
-        ${suppMacros.fat      > 0 ? `<div class="nutrient-total-row"><span class="nutrient-total-name" style="color:#FFB612">Fat</span><span class="nutrient-total-val">${suppMacros.fat.toFixed(1)}g</span></div>`         : ''}
-      </div>
+      <div class="section-title" style="margin-bottom:10px">Nutrient Totals</div>
+      <div class="nutrient-totals">${nutrientRows.map(n => nutrientRow(n)).join('')}</div>
     </div>` : ''}
   `;
 
@@ -2591,6 +2752,8 @@ function saveMacroGoals() {
 
 // Track whether user manually entered calories (disables auto-calc)
 let mealCalManual = false;
+// Full nutrient list from last OCR scan of a meal label
+let mealOcrNutrients = [];
 
 function showAddMealOverlay() {
   ['meal-name','meal-protein','meal-carbs','meal-fat','meal-calories'].forEach(id => {
@@ -2599,6 +2762,7 @@ function showAddMealOverlay() {
   document.getElementById('meal-save-template').checked = false;
   document.getElementById('meal-ocr-progress').style.display = 'none';
   mealCalManual = false;
+  mealOcrNutrients = [];
   // Populate saved meals dropdown
   const saved = Store.getSavedMeals();
   const sel = document.getElementById('saved-meal-select');
@@ -2619,8 +2783,9 @@ function saveMeal() {
   if (!calories && (protein || carbs || fat)) {
     calories = Math.round(protein * 4 + carbs * 4 + fat * 9);
   }
-  const mealData = { name, protein, carbs, fat, calories };
+  const mealData = { name, protein, carbs, fat, calories, nutrients: mealOcrNutrients };
   Store.addMeal(macroDate, mealData);
+  mealOcrNutrients = [];
   // Save as template if checked
   if (document.getElementById('meal-save-template').checked) {
     Store.addSavedMeal({ name, protein, carbs, fat, calories });
@@ -2660,6 +2825,9 @@ async function handleMealImage(e) {
       return +v.toFixed(1);
     };
 
+    // Store ALL nutrients for saving with the meal
+    mealOcrNutrients = nutrients;
+
     const calNut  = find(/calorie/i);
     const protNut = find(/protein/i);
     const carbNut = find(/total\s+carb|carbohydrate/i);
@@ -2675,13 +2843,38 @@ async function handleMealImage(e) {
       mealCalManual = false;
       autoCalcMealCals();
     }
-    const found = [calNut && 'calories', protNut && 'protein', carbNut && 'carbs', fatNut && 'fat'].filter(Boolean);
-    toast(found.length > 0 ? `Found: ${found.join(', ')}` : 'No macros detected — enter manually', found.length > 0 ? 'success' : 'warning');
+    const macrosFound = [calNut && 'calories', protNut && 'protein', carbNut && 'carbs', fatNut && 'fat'].filter(Boolean);
+    const extraCount = nutrients.length - macrosFound.length;
+    const msg = macrosFound.length > 0
+      ? `Found: ${macrosFound.join(', ')}${extraCount > 0 ? ` + ${extraCount} more nutrients` : ''}`
+      : 'No macros detected — enter manually';
+    toast(msg, macrosFound.length > 0 ? 'success' : 'warning');
   } catch(err) {
     toast('OCR failed — enter manually', 'error');
     document.getElementById('meal-ocr-status').textContent = 'OCR failed';
   }
   e.target.value = '';
+}
+
+// Aggregate all nutrients from meals logged on dateStr into a normalised totals object.
+// Each meal can have an optional nutrients[] array (from OCR). Macro fields are included too.
+function getMealNutrientsForDate(dateStr) {
+  const acc = {};
+  for (const m of Store.getMealsForDate(dateStr)) {
+    // Include OCR-captured full nutrient list if present
+    if (m.nutrients && m.nutrients.length) {
+      accumulateNutrients(acc, m.nutrients, 1);
+    } else {
+      // Fall back to macro fields stored on the meal
+      const synth = [];
+      if (m.calories) synth.push({ name: 'Calories', amount: m.calories, unit: 'kcal' });
+      if (m.protein)  synth.push({ name: 'Protein',  amount: m.protein,  unit: 'g' });
+      if (m.carbs)    synth.push({ name: 'Total Carbohydrate', amount: m.carbs, unit: 'g' });
+      if (m.fat)      synth.push({ name: 'Total Fat', amount: m.fat, unit: 'g' });
+      accumulateNutrients(acc, synth, 1);
+    }
+  }
+  return acc;
 }
 
 function deleteMealEntry(dateStr, mealId) {
