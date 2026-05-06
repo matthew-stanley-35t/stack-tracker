@@ -2591,12 +2591,13 @@ function macroWheel(label, current, suppAmt, goalValue, goalType, unit) {
   const target = goalValue || 0;
   const pct = target > 0 ? Math.min(current / target, 1) : 0;
   const offset = +(circ * (1 - pct)).toFixed(1);
-  const over = target > 0 && current > target;
   let fillColor = '#0080C6';
-  if (target > 0) {
-    if (goalType === 'max' && over) fillColor = '#EF5350';
-    else if (goalType === 'min' && over) fillColor = '#4CAF50';
-    else if (goalType === 'min' && !over) fillColor = '#0080C6';
+  if (target > 0 && goalType) {
+    const p = Math.min(pct, 1); // clamp at 100%
+    // max goal: green (hue 120) → red (hue 0) as you fill up
+    // min goal: red (hue 0) → green (hue 120) as you fill up
+    const hue = goalType === 'max' ? Math.round(120 * (1 - p)) : Math.round(120 * p);
+    fillColor = `hsl(${hue}, 72%, 50%)`;
   }
   const displayVal = unit === 'kcal' ? Math.round(current) : Math.round(current);
   const goalLabel = goalValue != null ? `${goalType === 'min' ? '≥' : '≤'}${goalValue}${unit}` : 'no goal';
